@@ -1,4 +1,4 @@
-# Bitcoin Clashic Mobile Wallet
+# AstraCore Mobile Wallet
 
 ## Build instructions
 
