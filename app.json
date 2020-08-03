@@ -1,4 +1,6 @@
 {
-  "name": "AstraCore",
-  "displayName": "AstraCore"
+  "expo": {
+    "name": "AstraCore",
+    "slug": "AstraCore"
+  }
 }
