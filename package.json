@@ -43,10 +43,9 @@
     "prop-types": "^15.6.2",
     "punycode": "^1.4.1",
     "querystring-es3": "^0.2.1",
-    "react": "16.11.0",
-    "react-native": "0.62.2",
+    "react": "16.13.1",
+    "react-native": "0.63.4",
     "react-native-app-link": "^1.0.0",
-    "react-native-async-storage": "0.0.1",
     "react-native-camera": "1.2.0",
     "react-native-config": "^0.12.0",
     "react-native-crypto": "^2.1.2",
@@ -117,83 +116,10 @@
     "jest-enzyme": "7.0.1",
     "jest-repl": "23.6.0",
     "jetifier": "^1.6.5",
-    "metro": "^0.56.0",
-    "metro-core": "^0.56.0",
+    "metro": "^0.59.0",
+    "metro-core": "^0.59.0",
     "metro-react-native-babel-preset": "^0.59.0",
-    "react-test-renderer": "16.11.0",
+    "react-test-renderer": "16.13.1",
     "schedule": "0.4.0"
-  },
-  "jest": {
-    "preset": "react-native",
-    "bail": true,
-    "verbose": true,
-    "automock": false,
-    "cacheDirectory": "<rootDir>/.jest-cache",
-    "moduleNameMapper": {
-      "^React$": "<rootDir>/node_modules/react"
-    },
-    "testMatch": [
-      "<rootDir>/(tests/unit/**/*.spec.(js|jsx|ts|tsx)|**/__tests__/*.(js|jsx|ts|tsx))"
-    ],
-    "transform": {
-      "^.+\\.js?$": "babel-jest"
-    }
-  },
-  "rnpm": {
-    "assets": [
-      "src/fonts/assets"
-    ]
-  },
-  "react-native": {
-    "zlib": "browserify-zlib",
-    "console": "console-browserify",
-    "constants": "constants-browserify",
-    "crypto": "react-native-crypto",
-    "dns": "dns.js",
-    "net": "react-native-tcp",
-    "domain": "domain-browser",
-    "http": "@tradle/react-native-http",
-    "https": "https-browserify",
-    "os": "react-native-os",
-    "path": "path-browserify",
-    "querystring": "querystring-es3",
-    "fs": "react-native-level-fs",
-    "_stream_transform": "readable-stream/transform",
-    "_stream_readable": "readable-stream/readable",
-    "_stream_writable": "readable-stream/writable",
-    "_stream_duplex": "readable-stream/duplex",
-    "_stream_passthrough": "readable-stream/passthrough",
-    "dgram": "react-native-udp",
-    "stream": "stream-browserify",
-    "timers": "timers-browserify",
-    "tty": "tty-browserify",
-    "vm": "vm-browserify",
-    "tls": false
-  },
-  "browser": {
-    "zlib": "browserify-zlib",
-    "console": "console-browserify",
-    "constants": "constants-browserify",
-    "crypto": "react-native-crypto",
-    "dns": "dns.js",
-    "net": "react-native-tcp",
-    "domain": "domain-browser",
-    "http": "@tradle/react-native-http",
-    "https": "https-browserify",
-    "os": "react-native-os",
-    "path": "path-browserify",
-    "querystring": "querystring-es3",
-    "fs": "react-native-level-fs",
-    "_stream_transform": "readable-stream/transform",
-    "_stream_readable": "readable-stream/readable",
-    "_stream_writable": "readable-stream/writable",
-    "_stream_duplex": "readable-stream/duplex",
-    "_stream_passthrough": "readable-stream/passthrough",
-    "dgram": "react-native-udp",
-    "stream": "stream-browserify",
-    "timers": "timers-browserify",
-    "tty": "tty-browserify",
-    "vm": "vm-browserify",
-    "tls": false
   }
 }
