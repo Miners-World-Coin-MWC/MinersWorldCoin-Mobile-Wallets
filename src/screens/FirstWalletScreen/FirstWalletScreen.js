@@ -92,7 +92,7 @@ class FirstWalletScreen extends PureComponent {
 
     CryptoLover = async () => {
 
-        let url = 'https://cryptoloverbots.com';
+        let url = 'https://github.com/cryptolover705';
 
         Linking.canOpenURL(url).then(supported => {
 
