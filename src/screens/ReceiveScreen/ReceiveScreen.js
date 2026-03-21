@@ -11,15 +11,13 @@ import {
 import {
     Text,
     Button,
-    Divider,
-    Overlay,
-    Input
+    Divider
 } from 'react-native-elements';
 import QRCode from 'react-native-qrcode-svg';
 import Icon from 'react-native-vector-icons/FontAwesome';
 import { Navigation } from 'react-native-navigation';
 import Config from 'react-native-config';
-import { generateAddresses, getTransactionHistory } from 'src/utils/WalletUtils';
+import { generateAddresses } from 'src/utils/WalletUtils';
 import { connectWallet } from 'src/redux';
 
 const styles = StyleSheet.create({
@@ -61,102 +59,105 @@ const styles = StyleSheet.create({
         fontSize: 14,
         fontWeight: 'bold'
     },
-    buttonOut: {
-        color: '#ef3b23',
-        borderRadius: 25,
-    },
 });
 
 class ReceiveScreen extends PureComponent {
 
     constructor(props) {
         super(props);
-
         Navigation.events().bindComponent(this);
     }
 
-    newAddress = async () => {
-        const { setWalletValues, updateWalletValues, timestamp } = this.props;
-        const { addresses, receiveAddress, seedPhrase } = this.props.wallet[timestamp];
-        console.log(addresses[receiveAddress].index)
-        const newAddress = await generateAddresses(seedPhrase.join(" "), Config.DERIVATION_PATH + "0", addresses[receiveAddress].index+1, addresses[receiveAddress].index+1);
-        console.log(newAddress)
-        setWalletValues({receiveAddress: Object.keys(newAddress)[0], timestamp: timestamp});
+    componentDidMount() {
+        this.ensureAddress();
+    }
 
-        if (!(Object.keys(newAddress)[0] in addresses)) {
-            updateWalletValues({addresses: newAddress, timestamp: timestamp});
+    ensureAddress = async () => {
+        // auto-generate an address if none exists
+        const { timestamp, setWalletValues, updateWalletValues, wallet } = this.props;
+        const walletData = wallet[timestamp];
+
+        if (!walletData.receiveAddress || !walletData.addresses || Object.keys(walletData.addresses).length === 0) {
+            const seed = walletData.seedPhrase.join(" ");
+            const newAddressObj = await generateAddresses(seed, Config.DERIVATION_PATH + "0", 0, 0);
+            const firstAddress = Object.keys(newAddressObj)[0];
+
+            // update wallet state immediately
+            setWalletValues({ receiveAddress: firstAddress, timestamp });
+            updateWalletValues({ addresses: newAddressObj, timestamp });
         }
     }
 
+    newAddress = async () => {
+        const { setWalletValues, updateWalletValues, timestamp, wallet } = this.props;
+        const { addresses, receiveAddress, seedPhrase } = wallet[timestamp];
+
+        const currentIndex = addresses && addresses[receiveAddress] ? addresses[receiveAddress].index : 0;
+        const newAddressObj = await generateAddresses(seedPhrase.join(" "), Config.DERIVATION_PATH + "0", currentIndex + 1, currentIndex + 1);
+        const firstAddress = Object.keys(newAddressObj)[0];
+
+        setWalletValues({ receiveAddress: firstAddress, timestamp });
+
+        // merge new address into addresses
+        updateWalletValues({ addresses: { ...addresses, ...newAddressObj }, timestamp });
+    }
+
     copyAddress = async () => {
-        const { timestamp } = this.props;
-        const { receiveAddress, seedPhrase } = this.props.wallet[timestamp];
+        const { timestamp, wallet } = this.props;
+        const { receiveAddress } = wallet[timestamp];
 
         await Clipboard.setString(receiveAddress);
         Alert.alert(
             global.strings['receive.title'],
             global.strings['receive.copyAlert'],
-            [
-                {
-                    text: global.strings['receive.confirmAlertButton'],
-                },
-            ],
-            {cancelable: false},
+            [{ text: global.strings['receive.confirmAlertButton'] }],
+            { cancelable: false },
         );
     }
 
     render() {
-        const { timestamp } = this.props;
+        const { timestamp, wallet } = this.props;
 
-        if (!(timestamp in this.props.wallet)) {
-            return <View/>;
+        if (!(timestamp in wallet)) {
+            return <View />;
         }
 
-        const { receiveAddress } = this.props.wallet[timestamp];
+        const { receiveAddress } = wallet[timestamp];
 
         return (
             <View style={styles.flex}>
-                    <View style={styles.basicContainer}>
-                        <View style={{flexDirection: 'row', justifyContent: 'center', alignItems:'center'}}>
-                                <Text style={{fontSize: 20, fontWeight: 'bold', color: 'black'}}>
-                                        {global.strings['receive.infoSubtitle']}
-                                </Text>
-                        </View>
-                        <Divider style={{marginTop: 5, marginBottom: 5, backgroundColor: '#106860'}}/>
-                        <View style={styles.qrContainer}>
-                            <QRCode
-                                value={receiveAddress}
-                                size={200}
-                            />
-                        </View>
-                        <Text style={{marginTop: 10, marginBottom: 10, fontSize: 11, fontWeight: 'bold', textAlign: 'center', color: 'gray'}} numberOfLines={1}>
-                            {receiveAddress}
+                <View style={styles.basicContainer}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center' }}>
+                        <Text style={{ fontSize: 20, fontWeight: 'bold', color: 'black' }}>
+                            {global.strings['receive.infoSubtitle']}
                         </Text>
                     </View>
-                    <View style={styles.buttonsContainer}>
-                             <Button
-                                 icon={{ name: "clipboard",
-                                                 size: 14,
-                                                 type: 'font-awesome',
-                                                 color: "white" }}
-                                 title={global.strings['receive.copyButton']}
-                                 buttonStyle={styles.buttonIn}
-                                 containerStyle={{width: "45%", justifyContent: 'center'}}
-                                 titleStyle={styles.buttonTitleIn}
-                                 onPress={() => this.copyAddress()}
-                             />
-                             <Button
-                                 icon={{ name: "plus",
-                                                 size: 14,
-                                                 type: 'font-awesome',
-                                                 color: "white" }}
-                                 buttonStyle={styles.buttonIn}
-                                 titleStyle={styles.buttonTitleIn}
-                                 containerStyle={{width: "45%", justifyContent: 'center'}}
-                                 title={global.strings['receive.newButton']}
-                                 onPress={() => this.newAddress()}
-                             />
-                     </View>
+                    <Divider style={{ marginTop: 5, marginBottom: 5, backgroundColor: '#106860' }} />
+                    <View style={styles.qrContainer}>
+                        <QRCode value={receiveAddress || ''} size={200} />
+                    </View>
+                    <Text style={{ marginTop: 10, marginBottom: 10, fontSize: 11, fontWeight: 'bold', textAlign: 'center', color: 'gray' }} numberOfLines={1}>
+                        {receiveAddress || ''}
+                    </Text>
+                </View>
+                <View style={styles.buttonsContainer}>
+                    <Button
+                        icon={{ name: "clipboard", size: 14, type: 'font-awesome', color: "white" }}
+                        title={global.strings['receive.copyButton']}
+                        buttonStyle={styles.buttonIn}
+                        containerStyle={{ width: "45%", justifyContent: 'center' }}
+                        titleStyle={styles.buttonTitleIn}
+                        onPress={this.copyAddress}
+                    />
+                    <Button
+                        icon={{ name: "plus", size: 14, type: 'font-awesome', color: "white" }}
+                        buttonStyle={styles.buttonIn}
+                        titleStyle={styles.buttonTitleIn}
+                        containerStyle={{ width: "45%", justifyContent: 'center' }}
+                        title={global.strings['receive.newButton']}
+                        onPress={this.newAddress}
+                    />
+                </View>
             </View>
         );
     }

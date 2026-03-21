@@ -11,54 +11,16 @@ import {
 } from 'react-native';
 import {
     Text,
-    Button,
-    Overlay,
-    Input
 } from 'react-native-elements';
-import Icon from 'react-native-vector-icons/FontAwesome';
-import Identicon from 'identicon.js';
 import { WALLET_SCREEN, pushStarterStack, pushPasswordGate } from 'src/navigation';
-import { getMirgationWallets, removeMirgationWallets, createWalletFromMigrate, decryptData, decryptWallet, numberWithCommas } from 'src/utils/WalletUtils';
+import { getMirgationWallets, removeMirgationWallets, decryptData, decryptWallet, numberWithCommas, convertMWCtoUSD, getAddressBalance, generateAddresses } from 'src/utils/WalletUtils';
 import { Navigation } from 'react-native-navigation';
 import { connectWallet } from 'src/redux';
 import Config from 'react-native-config';
 
-
 const styles = StyleSheet.create({
-    flex: {
-        flex: 1,
-        alignItems: 'center',
-        justifyContent: 'flex-start'
-    },
-    basicContainer: {
-        padding: 10,
-        backgroundColor: 'white',
-        alignSelf: 'center',
-        justifyContent: 'flex-start',
-        flexDirection: 'row',
-        width: '100%',
-        borderBottomColor: '#f0eff5',
-        borderBottomWidth: 1
-    },
-    qrContainer: {
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginTop: 10
-    },
-    buttonsContainer: {
-        flexDirection: 'row',
-        alignSelf: 'center',
-        justifyContent: 'center',
-    },
-    buttonIn: {
-        backgroundColor: '#000773',
-        borderRadius: 5,
-        margin: 10,
-    },
-    buttonTitleIn: {
-        fontSize: 14,
-        fontWeight: 'bold'
-    },
+    flex: { flex: 1, alignItems: 'center', justifyContent: 'flex-start' },
+    basicContainer: { padding: 10, backgroundColor: 'white', alignSelf: 'center', justifyContent: 'flex-start', flexDirection: 'row', width: '100%', borderBottomColor: '#f0eff5', borderBottomWidth: 1 }
 });
 
 class WalletListScreen extends PureComponent {
@@ -85,27 +47,11 @@ class WalletListScreen extends PureComponent {
 
         Navigation.mergeOptions(this.props.componentId, {
             topBar: {
-                largeTitle: {
-                    visible: false,
-                    noBorder: true,
-                    fontSize: 30,
-                    fontFamily: 'HelveticaBold',
-                    color: 'white',
-                },
-                title: {
-                    text: global.strings['walletList.title']
-                },
-                rightButtons: [
-                    {
-                        color: 'white',
-                        id: 'addWallet',
-                        icon: require('../../assets/icons/ic_plus.png'),
-                    }
-                ],
+                largeTitle: { visible: false, noBorder: true, fontSize: 30, fontFamily: 'HelveticaBold', color: 'white' },
+                title: { text: global.strings['walletList.title'] },
+                rightButtons: [{ color: 'white', id: 'addWallet', icon: require('../../assets/icons/ic_plus.png') }],
                 leftButtons: [],
-                backButton: {
-
-                },
+                backButton: {},
                 visible: true,
             }
         })
@@ -139,20 +85,40 @@ class WalletListScreen extends PureComponent {
         }
     }
 
-    openWalletScreen = (timestamp) => {
-        const { setWalletValues } = this.props;
-        const { isMigrated, migrationData } = this.props.wallet[timestamp];
+    openWalletScreen = async (timestamp) => {
+        const { setWalletValues, wallet } = this.props;
+        const { isMigrated, migrationData, receiveAddress, addresses } = wallet[timestamp];
 
         if (isMigrated) {
+            // Auto-generate first receive address if missing
+            if (!receiveAddress || !addresses || Object.keys(addresses).length === 0) {
+                const seed = migrationData.seedPhrase.join(" ");
+                const newAddresses = await generateAddresses(seed, Config.DERIVATION_PATH + "0", 0, 0);
+                const firstAddress = Object.keys(newAddresses)[0];
+
+                setWalletValues({ receiveAddress: firstAddress, timestamp });
+                setWalletValues({ addresses: newAddresses, timestamp });
+            }
+
             pushPasswordGate(1, timestamp)
         } else {
             pushPasswordGate(2, timestamp, (password) => {
                 var decryptedPassword = decryptData(migrationData.password, password);
 
                 if (decryptedPassword == password) {
-                    let wallet = decryptWallet(migrationData, password);
-                    wallet.timestamp = timestamp;
-                    setWalletValues(wallet);
+                    let walletData = decryptWallet(migrationData, password);
+                    walletData.timestamp = timestamp;
+
+                    // Ensure first receive address exists for non-migrated wallet
+                    if (!walletData.receiveAddress || !walletData.addresses || Object.keys(walletData.addresses).length === 0) {
+                        const seed = walletData.seedPhrase.join(" ");
+                        const newAddresses = generateAddresses(seed, Config.DERIVATION_PATH + "0", 0, 0);
+                        const firstAddress = Object.keys(newAddresses)[0];
+                        walletData.receiveAddress = firstAddress;
+                        walletData.addresses = newAddresses;
+                    }
+
+                    setWalletValues(walletData);
                     return true;
                 }
 
@@ -163,17 +129,17 @@ class WalletListScreen extends PureComponent {
 
     render() {
         const wallets = this.props.wallet;
-        const { actionAddress, actionsOverlay } = this.state;
 
         return (
             <View style={[styles.flex, {alignSelf: 'center', width: '100%'}]}>
                 <ScrollView style={{width: '100%'}}>
                     {
-                            Object.keys(wallets).sort().map((timestamp, index) => (
-                                wallets[timestamp].isCreated && <TouchableOpacity onPress={() => this.openWalletScreen(timestamp)} key={index}>
+                        Object.keys(wallets).sort().map((timestamp, index) => (
+                            wallets[timestamp].isCreated &&
+                            <TouchableOpacity onPress={() => this.openWalletScreen(timestamp)} key={index}>
                                 <WalletItem params={wallets[timestamp]} />
                             </TouchableOpacity>
-                            ))
+                        ))
                     }
                 </ScrollView>
             </View>
@@ -183,22 +149,73 @@ class WalletListScreen extends PureComponent {
 
 class WalletItem extends PureComponent {
 
+    constructor(props) {
+        super(props);
+
+        this.state = {
+            usdValue: null,
+            balance: null
+        };
+
+        this.polling = null;
+    }
+
+    async componentDidMount() {
+        this.updateBalance();
+        this.polling = setInterval(this.updateBalance, 10000); // auto-update every 10s
+    }
+
+    componentWillUnmount() {
+        if (this.polling) clearInterval(this.polling);
+    }
+
+    updateBalance = async () => {
+        const { params } = this.props;
+        if (!params.isMigrated || !params.addresses || Object.keys(params.addresses).length === 0) return;
+
+        try {
+            let total = 0;
+            for (const addr of Object.keys(params.addresses)) {
+                const res = await getAddressBalance(addr);
+
+                if (res && res.confirmed != null) {
+                    total += parseFloat(res.confirmed) / 1e8; // convert satoshis to MWC
+                }
+            }
+
+            let usdValue = await convertMWCtoUSD(total);
+            if (typeof usdValue !== "number" || isNaN(usdValue)) {
+                usdValue = 0; // fallback if API failed
+            }
+
+            this.setState({ usdValue, balance: total });
+
+        } catch (e) {
+            console.log("Error updating wallet balance/price", e);
+            this.setState({ usdValue: 0 }); // fail-safe
+        }
+    }
+
     render = () => {
         const { params } = this.props;
-        var options = {
-            foreground: [255, 191, 0, 255],
-        };
+        const { usdValue, balance } = this.state;
 
         return (
             <View style={styles.basicContainer}>
                 <Image style={{width: 50, height: 50, marginRight: 10, borderRadius: 5}} source={require('assets/icons/logo.png')}/>
                 <View style={{flexDirection: 'column', justifyContent: 'center', alignItems: 'flex-start'}}>
                     <Text style={{fontSize: 16, color: "black"}} numberOfLines={2}>
-                     <Text style={{fontWeight: 'bold'}}>{params.title}</Text>
+                        <Text style={{fontWeight: 'bold'}}>{params.title}</Text>
                     </Text>
                     <Text style={{fontSize: 12, marginTop: 5}}>
-                        {params.isMigrated ? (numberWithCommas((params.balance.confirmed/Math.pow(10, 8)).toFixed(4)) + " " + Config.COIN_NAME) : global.strings['walletList.notMigrated']}
+                        {params.isMigrated ?
+                            (balance !== null ? numberWithCommas(balance.toFixed(8)) + " " + Config.COIN_NAME : "Loading...") 
+                            : global.strings['walletList.notMigrated']
+                        }
                     </Text>
+                    {usdValue != null && <Text style={{fontSize: 12, color: "black", marginTop: 2}}>
+                        ${usdValue.toFixed(8)}
+                    </Text>}
                 </View>
             </View>
         );

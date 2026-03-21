@@ -21,6 +21,8 @@ import * as Keychain from 'react-native-keychain';
 import { connectWallet } from 'src/redux';
 import { getTransactionHistory, getBalance } from 'src/utils/WalletUtils';
 import { pushWalletList, pushPasswordGate, pushStarterStack, LANGUAGE_LIST_SCREEN, IMPORT_KEY_SCREEN } from 'src/navigation';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { ADDRESS_TYPES } from '../../utils/WalletUtils';
 
 const styles = StyleSheet.create({
     flex: {
@@ -101,6 +103,22 @@ class SettingsScreen extends PureComponent {
         })
 
         Navigation.events().bindComponent(this);
+    }
+
+    setAddressType = async (type) => {
+        await AsyncStorage.setItem("addressType", type);
+
+        Alert.alert(
+            "Address Type Updated",
+            "New addresses will now use: " + type.toUpperCase(),
+            [{ text: "OK" }],
+            { cancelable: false }
+        );
+    }
+
+    getCurrentAddressType = async () => {
+        const type = await AsyncStorage.getItem("addressType");
+        return type || ADDRESS_TYPES.BECH32;
     }
 
     navigationButtonPressed = ({ buttonId }) => {
@@ -285,13 +303,13 @@ class SettingsScreen extends PureComponent {
         ]
 
         const secondSection = [
-            /*{
+            {
                 title: global.strings['settings.importWIF'],
                 icon: 'key',
                 subtitle: null,
 
                 onPress: () => this.openWIFImport()
-            },*/
+            },
             {
                 title: global.strings['settings.changePassword'],
                 icon: 'unlock',
@@ -304,6 +322,28 @@ class SettingsScreen extends PureComponent {
                 icon: 'language',
                 subtitle: null,
                 onPress: () => this.changeLanguage()
+            },
+        ]
+
+        const addressSection = [
+            {
+                title: "Legacy Address (P2PKH)",
+                icon: 'bitcoin',
+                subtitle: "Addresses start with 9",
+                topDivider: true,
+                onPress: () => this.setAddressType(ADDRESS_TYPES.LEGACY)
+            },
+            {
+                title: "SegWit Address (P2SH)",
+                icon: 'bitcoin',
+                subtitle: "Addresses start with 5",
+                onPress: () => this.setAddressType(ADDRESS_TYPES.SEGWIT)
+            },
+            {
+                title: "Bech32 Address (Native SegWit)",
+                icon: 'bitcoin',
+                subtitle: "Addresses start with mwc1",
+                onPress: () => this.setAddressType(ADDRESS_TYPES.BECH32)
             },
         ]
 
@@ -347,7 +387,25 @@ class SettingsScreen extends PureComponent {
                             topDivider={item.topDivider}
                             titleStyle={{color: 'black'}}
                             subtitleStyle={{fontSize: 12, color: 'gray'}}
-                            rightIcon={{ name: 'chevron-right', type: 'font-owesome', size: 20 }}
+                            rightIcon={{ name: 'chevron-right', type: 'font-awesome', size: 20 }}
+                            leftIcon={{ name: item.icon, type: 'font-awesome', color: 'gray', size: 20 }}
+                        />
+                    ))
+                }
+
+                <View style={{marginTop: 20}} />
+
+                {
+                    addressSection.map((item, i) => (
+                        <ListItem
+                            onPress={item.onPress}
+                            key={i}
+                            title={item.title}
+                            subtitle={item.subtitle}
+                            bottomDivider={true}
+                            topDivider={item.topDivider}
+                            titleStyle={{color: 'black'}}
+                            subtitleStyle={{fontSize: 12, color: 'gray'}}
                             leftIcon={{ name: item.icon, type: 'font-awesome', color: 'gray', size: 20 }}
                         />
                     ))

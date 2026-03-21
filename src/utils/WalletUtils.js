@@ -6,6 +6,8 @@ import * as bitcoin from "bitcoinjs-lib";
 import * as aes256 from "aes256";
 import Config from 'react-native-config';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import axios from "axios";
+const API = "https://api.minersworld.org";
 
 const hashType = bitcoin.Transaction.SIGHASH_ALL;
 const mwc = {
@@ -281,112 +283,134 @@ export async function sendTransation(socketConnect, walletAddresses, mainAddress
 	var outputsAmount = 0;
 	var keyPairs = [];
 	var scripts = [];
-    const txb = new bitcoin.TransactionBuilder(mwc)
+	const txb = new bitcoin.TransactionBuilder(mwc);
 
-    txb.setVersion(2);
+	txb.setVersion(2);
 
 	for (var address in walletAddresses) {
-		var balance = null;
-
 		try {
-			balance = await socketConnect.get_balance(address);
+			let utxo = await getUTXOs(address);
+
+			// optional but recommended (reduces tx size)
+			utxo.sort((a, b) => b.value - a.value);
+
+			for (var k = 0; k < utxo.length; k++) {
+
+				// ✅ correct break condition
+				if (outputsAmount >= (amount + fee)) {
+					break;
+				}
+
+				var script = Buffer.from(utxo[k].script, 'hex');
+				var type = getScriptType(script);
+
+				keyPairs.push(
+					bitcoin.ECPair.fromWIF(
+						walletAddresses[address].privateKey,
+						mwc
+					)
+				);
+
+				if (type == 'bech32') {
+					var p2wpkh = getP2WPKHScript(
+						keyPairs[keyPairs.length - 1].publicKey
+					);
+
+					txb.addInput(
+						utxo[k].txid,
+						utxo[k].index,
+						null,
+						p2wpkh.output
+					);
+				} else {
+					txb.addInput(utxo[k].txid, utxo[k].index);
+				}
+
+				outputsAmount += parseInt(utxo[k].value);
+
+				scripts.push({
+					script: script,
+					type: type,
+					value: parseInt(utxo[k].value),
+				});
+			}
 		} catch (e) {
 			console.log(e);
 		}
-
-		if (balance != null && (balance.balance > 0)) {
-			try {
-				let utxo = await socketConnect.get_unspent(address);
-
-				for (var k = 0; k < utxo.length; k++) {
-
-					if (parseInt(outputsAmount-amount-fee) > 0) {
-						break;
-					}
-
-					var script = new Buffer(utxo[k].script, 'hex');
-					var type = getScriptType(script);
-
-					keyPairs.push(bitcoin.ECPair.fromWIF(walletAddresses[address].privateKey, mwc));
-
-					if (type == 'bech32') {
-						var p2wpkh = getP2WPKHScript(keyPairs[k].publicKey)
-						txb.addInput(utxo[k].txid, utxo[k].index, null, p2wpkh.output);
-					} else {
-						txb.addInput(utxo[k].txid, utxo[k].index);
-					}
-
-					outputsAmount += parseInt(utxo[k].value);
-
-					scripts.push({
-						'script': script,
-						'type': type,
-						'value': parseInt(utxo[k].value),
-					});
-
-				}
-			} catch (e) {
-				console.log(e);
-			}
-		}
 	}
 
-	if (outputsAmount < fee) {
-		return {error: "Output amount error"};
+	// ✅ correct balance check
+	if (outputsAmount < (amount + fee)) {
+		return { error: "Insufficient funds" };
 	}
 
 	try {
-		if (outputsAmount-amount-fee > 0) {
-			if (mainAddress != null) {
-				txb.addOutput(mainAddress, parseInt(outputsAmount-amount-fee));
-			} else {
-				return {error: "Main address error"};
+		const change = outputsAmount - amount - fee;
+
+		// ✅ safe change handling
+		if (change > 0) {
+			if (!mainAddress) {
+				return { error: "Main address error" };
 			}
+			txb.addOutput(mainAddress, change);
 		}
 
 		txb.addOutput(recieveAddress, parseInt(amount));
 
 	} catch (e) {
-		return {error: e.message}
+		return { error: e.message };
 	}
 
+	// 🔐 sign inputs
 	for (var i = 0; i < scripts.length; i++) {
 		var value = scripts[i].value;
 
 		switch (scripts[i].type) {
 			case 'bech32':
 				txb.sign(i, keyPairs[i], null, null, value, null);
-				break
+				break;
 
 			case 'segwit':
 				var redeem = getP2WPKHScript(keyPairs[i].publicKey);
 				var p2sh = getP2SHScript(redeem);
 
 				txb.sign(i, keyPairs[i], p2sh.redeem.output, null, value, null);
-				break
+				break;
 
 			case 'legacy':
-				txb.sign(i, keyPairs[i])
-				break
+				txb.sign(i, keyPairs[i]);
+				break;
 
 			default:
 				console.log("error in default: ", scripts[i].type);
-				break
+				break;
 		}
 	}
 
 	try {
-		var tx = txb.build().toHex()
-		console.log("Transaction: ", tx)
-		let broadcast = await socketConnect.broadcast_transaction(tx)
+		var tx = txb.build().toHex();
+		console.log("Transaction: ", tx);
 
-		console.log("Transaction error: ", broadcast);
-		return {tx: broadcast};
+		let broadcast;
+
+		try {
+			const res = await axios.post(`${API}/broadcast`, tx, {
+				headers: { 'Content-Type': 'text/plain' }
+			});
+			broadcast = res.data;
+		} catch (e) {
+			console.log("broadcast error", e);
+			return { error: "Broadcast failed" };
+		}
+
+		console.log("Broadcast result: ", broadcast);
+
+		return { tx: broadcast };
+
 	} catch (e) {
 		console.log("Error: ", e.message);
-		return {error: e.message}
+		return { error: e.message };
 	}
-
 }
 
 export async function subscribeToAddresses(socketConnect, walletAddresses, callback) {
@@ -524,77 +548,218 @@ async function createTransactionsFromHistory(socketConnect, walletAddresses, his
 }
 
 export async function getTransactionHistory(socketConnect, walletAddresses, transactions = null) {
-	var allHistory = [];
+	let allTxids = [];
 
 	for (let address in walletAddresses) {
-		await socketConnect.get_history(address).then((history) => {
-			allHistory.push.apply(allHistory, history.tx);
-		})
+		try {
+			const res = await axios.get(`${API}/history/${address}`);
+			allTxids.push(...res.data.result.tx);
+		} catch (e) {
+			console.log("history error", e);
+		}
 	}
 
-	allHistory = allHistory.filter(function(item, pos) {
-	    return allHistory.indexOf(item) == pos;
-	});
+	// remove duplicates
+	allTxids = [...new Set(allTxids)];
 
-	if (transactions != null) {
-		for (var time in transactions) {
-			for (var i = 0; i < allHistory.length; i++) {
-				if (allHistory[i] == transactions[time].hash && transactions[time].confirmations > 6) {
-					allHistory.splice(i, 1);
-					break;
-				}
+	let txObjects = {};
+
+	await Promise.all(
+		allTxids.map(async (txid) => {
+			const tx = await getTransaction(txid);
+			if (!tx) return;
+
+			const parsed = await createTransactionObject(null, walletAddresses, tx);
+
+			if (parsed.time) {
+				txObjects[parsed.time + parsed.hash] = parsed;
 			}
+		})
+	);
+
+	return txObjects;
+}
+
+export async function estimateFee(socketConnect, walletAddresses, options = {speed: "normal"}) {
+	try {
+		// 1️⃣ Get network fee
+		const res = await axios.get(`${API}/fee`);
+		let feerateSatPerKB = res.data.result.feerate; // satoshis per KB
+
+		// Adjust fee based on speed preference
+		const speedMultiplier = {
+			slow: 0.7,
+			normal: 1,
+			fast: 1.5
+		};
+		feerateSatPerKB *= speedMultiplier[options.speed] || 1;
+
+		// Convert sat/kB → sat/B
+		const satPerByte = feerateSatPerKB / 1000;
+
+		// 2️⃣ Estimate tx size
+		// Count inputs from wallet addresses with balance
+		let inputCount = 0;
+		for (const addr in walletAddresses) {
+			const balance = await socketConnect.get_balance(addr);
+			if (balance && balance.balance > 0) inputCount += 1;
 		}
+
+		const outputCount = 2; // recipient + change
+
+		// SegWit input size ~68 bytes, Legacy ~148 bytes
+		const inputSize = 148;
+		const outputSize = 34; // standard P2PKH/P2WPKH output
+		const overhead = 10; // tx overhead
+
+		const estimatedSize = inputCount * inputSize + outputCount * outputSize + overhead;
+
+		// 3️⃣ Calculate fee in sats
+		const feeSats = Math.ceil(satPerByte * estimatedSize);
+
+		// 4️⃣ Convert to coin
+		const feeCoin = feeSats / 100000000;
+
+		return feeCoin.toFixed(8);
+
+	} catch (e) {
+		console.log("Smart fee error", e);
+		// fallback
+		return "0.00001";
 	}
-
-	return createTransactionsFromHistory(socketConnect, walletAddresses, allHistory);
 }
 
-export async function estimateFee () {
-	return "0.00001";
+// Fetch current MWC price in USD
+export async function getMWCPrice() {
+    try {
+        const res = await axios.get(`${API}/price`);
+        const price = res.data.quotes?.USD?.price || 0;
+        return parseFloat(price); // returns a number like 0.00007923
+    } catch (e) {
+        console.log("MWC price fetch error", e);
+        return 0;
+    }
 }
 
-export async function getBalance(transactions) {
-   	let balance = {"confirmed": 0, "unconfirmed": 0};
-   	let currentHeight = (await socketConnect.get_info()).blocks;
+// Convert coin amount to USD
+export async function convertMWCtoUSD(amountMWC) {
+    const price = await getMWCPrice();
+    const usdValue = amountMWC * price;
+    return usdValue.toFixed(6); // round to 6 decimals for readability
+}
 
-    for (time in transactions) {
-		if (transactions[time].type) {
-			balance.confirmed -= transactions[time].amount;
-		} else {
-			balance.confirmed += transactions[time].amount;
-		}
+// Example usage in transaction details
+export async function attachUSDValueToTx(transaction) {
+    if (!transaction.amount) return transaction;
+
+    const usdValue = await convertMWCtoUSD(transaction.amount);
+    return { ...transaction, usdValue };
+}
+
+// Example usage for wallet balances
+export async function attachUSDValueToWallet(wallet) {
+    let totalBalance = 0;
+
+    for (const addr in wallet.addresses) {
+        try {
+            const res = await getAddressBalance(addr);
+            if (res && res.balance) totalBalance += parseInt(res.balance) / 1e8; // convert sats → coins
+        } catch (e) {
+            console.log("Error fetching address balance", e);
+        }
     }
 
-    balance.confirmed -= balance.unconfirmed;
-    return balance;
+    const usdValue = await convertMWCtoUSD(totalBalance);
+    return { ...wallet, totalBalance, usdValue };
+}
+
+export async function getAddressBalance(address) {
+    try {
+        const res = await axios.get(`${API}/balance/${address}`);
+
+        // check response structure safely
+        const balance = res?.data?.result?.balance ?? 0;
+
+        return {
+            confirmed: parseFloat(balance),  // still in satoshis
+            unconfirmed: 0
+        };
+    } catch (e) {
+        console.log("balance error", e);
+        return { confirmed: 0, unconfirmed: 0 };
+    }
+}
+
+export async function getUTXOs(address) {
+	try {
+		const res = await axios.get(`${API}/unspent/${address}`);
+		return res.data.result;
+	} catch (e) {
+		console.log("utxo error", e);
+		return [];
+	}
+}
+
+export async function getTransaction(txid) {
+	try {
+		const res = await axios.get(`${API}/transaction/${txid}`);
+		return res.data.result;
+	} catch (e) {
+		console.log("tx fetch error", e);
+		return null;
+	}
 }
 
 export async function checkMempool(socketConnect, walletAddresses, address, callback) {
 	try {
-		var mempool = (await socketConnect.get_mempool(address)).tx;
-		console.log("mempool array",mempool);
-		var mempoolObjects = await createTransactionsFromHistory(socketConnect, walletAddresses, mempool);
+		let res = await axios.get(`${API}/mempool/${address}`);
+		let mempool = res.data.result.tx || [];
+
+		let mempoolObjects = {};
+
+		await Promise.all(
+			mempool.map(async (txid) => {
+				const tx = await getTransaction(txid);
+				if (!tx) return;
+
+				const parsed = await createTransactionObject(null, walletAddresses, tx);
+				mempoolObjects[parsed.time + parsed.hash] = parsed;
+			})
+		);
 
 		callback(mempoolObjects, false);
 
-		var interval = setInterval(function() {
-			socketConnect.get_mempool(address).then((newMempool) => {
-				if (JSON.stringify(mempool) != JSON.stringify(newMempool.tx)) {
-					createTransactionsFromHistory(socketConnect, walletAddresses, newMempool.tx).then((newMempoolObjects) => {
-						callback(newMempoolObjects, true);
-						mempool = newMempool.tx;
-					})
+		let interval = setInterval(async () => {
+			try {
+				let newRes = await axios.get(`${API}/mempool/${address}`);
+				let newMempool = newRes.data.result.tx || [];
+
+				if (JSON.stringify(mempool) !== JSON.stringify(newMempool)) {
+					let newObjects = {};
+
+					await Promise.all(
+						newMempool.map(async (txid) => {
+							const tx = await getTransaction(txid);
+							if (!tx) return;
+
+							const parsed = await createTransactionObject(null, walletAddresses, tx);
+							newObjects[parsed.time + parsed.hash] = parsed;
+						})
+					);
+
+					callback(newObjects, true);
+					mempool = newMempool;
 				}
 
-				if (newMempool.tx.length == 0) {
+				if (newMempool.length === 0) {
 					clearInterval(interval);
 				}
-			});
-		}, 2000);
-	} catch (e) {
-		console.log('mempool error: ', e)
-		return;
-	}
+			} catch (e) {
+				console.log("mempool polling error", e);
+			}
+		}, 5000);
 
+	} catch (e) {
+		console.log('mempool error: ', e);
+	}
 }
