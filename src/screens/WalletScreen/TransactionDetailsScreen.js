@@ -255,7 +255,7 @@ class TransactionDetailsScreen extends PureComponent {
                             {numberWithCommas((transaction.amount / 1e8).toFixed(8))} {Config.COIN_NAME}
                         </Text>
                         {transaction.usdValue && <Text style={{ fontSize: 12, color: "white", textAlign: "right" }}>
-                            ${transaction.usdValue}
+                            ${transaction.usdValue.toFixed(8)}
                         </Text>}
                     </View>
                 </View>
@@ -270,7 +270,7 @@ class TransactionDetailsScreen extends PureComponent {
                             {numberWithCommas((transaction.fee / 1e8).toFixed(8))} {Config.COIN_NAME}
                         </Text>
                         {transaction.feeUSD && <Text style={{ fontSize: 12, color: "white", textAlign: "right" }}>
-                            ${transaction.feeUSD}
+                            ${transaction.feeUSD.toFixed(8)}
                         </Text>}
                     </View>
                 </View>

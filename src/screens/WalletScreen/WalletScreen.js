@@ -11,15 +11,14 @@ import {
     ActivityIndicator
 } from 'react-native';
 import {
-    Text,
-    Button
+    Text
 } from 'react-native-elements';
 import Icon from 'react-native-vector-icons/Entypo';
-import { SETTINGS_SCREEN, CONFIRMATION_SCREEN, TRANSACTION_DETAILS_SCREEN, pushWalletList } from 'src/navigation';
+import { TRANSACTION_DETAILS_SCREEN, pushWalletList } from 'src/navigation';
 import { Navigation } from 'react-native-navigation';
 import { connectWallet } from 'src/redux';
 import moment from "moment";
-import { subscribeToAddresses, getTransactionHistory, getBalance, isAddress, generateAddresses, checkMempool, numberWithCommas } from 'src/utils/WalletUtils';
+import { subscribeToAddresses, getTransactionHistory, getAddressBalance, checkMempool, numberWithCommas, convertMWCtoUSD, formatUSD  } from 'src/utils/WalletUtils';
 import Config from 'react-native-config';
 
 const styles = StyleSheet.create({
@@ -33,26 +32,8 @@ const styles = StyleSheet.create({
         backgroundColor: '#202225',
         width: '100%',
         padding: 10,
-        paddingTop: -5,
         alignContent: 'space-between',
         justifyContent: 'space-between'
-    },
-    buttonsContainer: {
-        flexDirection: 'row',
-        alignContent: 'space-between',
-    },
-    buttonIn: {
-        backgroundColor: 'white',
-        borderRadius: 5,
-    },
-    buttonInTitle: {
-        color: '#505659',
-        fontSize: 14,
-        fontWeight: 'bold'
-    },
-    buttonOut: {
-        color: '#ef3b23',
-        borderRadius: 25,
     },
     balanceTitle: {
         fontSize: 22,
@@ -64,6 +45,13 @@ const styles = StyleSheet.create({
         color: 'white',
         textAlign: 'center',
         opacity: 0.8
+    },
+    usdValue: {
+        color: 'white',
+        textAlign: 'center',
+        fontSize: 14,
+        marginTop: 2,
+        opacity: 0.8
     }
 });
 
@@ -73,11 +61,11 @@ class WalletScreen extends PureComponent {
         super(props);
 
         this.state = {
-            mempool: {},
-            isConnected: global.socketConnect.status(),
+            isConnected: global.socketConnect?.status?.() ?? false,
             appState: AppState.currentState,
-            isRefreshing: false
-        }
+            isRefreshing: false,
+            usdValue: null
+        };
 
         Navigation.mergeOptions(this.props.componentId, {
             bottomTabs: {
@@ -92,10 +80,21 @@ class WalletScreen extends PureComponent {
         AppState.addEventListener('change', this.handleAppStateChange);
         this.firstOpen();
 
+        // ✅ SAFE polling (since no .on exists)
         this.connectInterval = setInterval(() => {
-            this.setState({isConnected: global.socketConnect.status()})
-        }, 5000)
+            const currentStatus = global.socketConnect?.status?.() ?? false;
 
+            // Detect connection change
+            if (currentStatus !== this.state.isConnected) {
+                this.setState({ isConnected: currentStatus });
+
+                if (currentStatus === true) {
+                    this.refreshHistory(); // reconnect → refresh
+                }
+            }
+        }, 3000);
+
+        this.firstOpen();
     }
 
     componentWillUnmount() {
@@ -103,69 +102,145 @@ class WalletScreen extends PureComponent {
         AppState.removeEventListener('change', this.handleAppStateChange);
     }
 
-    startCheckingMempool = (address = null) => {
-        const { timestamp } = this.props;
-        const { addresses, transactions } = this.props.wallet[timestamp];
-
-        if (!addresses) {
-            const { receiveAddress } = this.props.wallet[timestamp];
-            address = receiveAddress;
+    handleAppStateChange = (nextAppState) => {
+        if (this.state.appState.match(/background/) && nextAppState === 'active') {
+            global.socketConnect?.connect?.();
+            pushWalletList();
         }
-
-        checkMempool(global.socketConnect, addresses, address, this.updateTransactionObjects)
+        this.setState({ appState: nextAppState });
     }
 
-    updateTransactionObjects = (transactionObjects, needUpdate) => {
+    startCheckingMempool = () => {
+        const { timestamp } = this.props;
+        const { addresses } = this.props.wallet[timestamp];
+
+        if (!addresses || addresses.length === 0) return;
+
+        checkMempool(global.socketConnect, addresses, null, this.updateTransactionObjects);
+    }
+
+    updateTransactionObjects = async (transactionObjects, needUpdate) => {
         const { updateWalletValues, setWalletValues, timestamp } = this.props;
-        const { addresses, transactions } = this.props.wallet[timestamp];
+        const { transactions, addresses } = this.props.wallet[timestamp];
+
+        if (!addresses || Object.keys(addresses).length === 0) return;
 
         if (needUpdate) {
-            this.refreshHistory();
+            await this.refreshHistory();
             return;
         }
 
-        updateWalletValues({transactions: transactionObjects, timestamp});
-        getBalance({...transactions, ...transactionObjects}).then((balance) => {
-            setWalletValues({balance, timestamp});
-        })
-    }
+        const mergedTransactions = { ...transactions, ...transactionObjects };
+        updateWalletValues({ transactions: mergedTransactions, timestamp });
 
-    handleAppStateChange = (nextAppState) => {
-        if (this.state.appState.match(/background/) && nextAppState === 'active') {
-            global.socketConnect.connect();
-            pushWalletList();
+        // ✅ Balance + USD merge
+        try {
+            let totalBalance = 0;
+
+            for (const addr of Object.keys(addresses)) {
+                const res = await getAddressBalance(addr);
+
+                if (res && res.confirmed != null) {
+                    totalBalance += parseFloat(res.confirmed);
+                }
+            }
+
+            // satoshi -> MWC
+            totalBalance = totalBalance / 1e8;
+
+            setWalletValues({ balance: { confirmed: totalBalance }, timestamp });
+
+            // ✅ USD conversion (added)
+            if (this.updateBalanceUSD) {
+                const usd = await convertMWCtoUSD(totalBalance);
+                this.setState({ usdValue: usd });
+            }
+
+        } catch (e) {
+            console.warn("updateTransactionObjects balance error:", e);
+            setWalletValues({ balance: { confirmed: 0 }, timestamp });
+            this.setState({ usdValue: 0 });
         }
-        this.setState({appState: nextAppState});
-    }
+    };
 
-    firstOpen = () => {
-        const { updateWalletValues, setWalletValues, timestamp } = this.props;
-        const { addresses, transactions, migrationData } = this.props.wallet[timestamp];
+    firstOpen = async () => {
+        const { timestamp } = this.props;
+        const { addresses } = this.props.wallet[timestamp];
+
+        if (!addresses || addresses.length === 0) return;
+
+        subscribeToAddresses(global.socketConnect, addresses, this.updateTransactionObjects);
 
         this.startCheckingMempool();
-        subscribeToAddresses(global.socketConnect, addresses, this.updateTransactionObjects);
-        this.refreshHistory();
 
+        await this.refreshHistory();
     }
 
     refreshHistory = async () => {
         const { updateWalletValues, setWalletValues, timestamp } = this.props;
         const { addresses, transactions } = this.props.wallet[timestamp];
 
-        this.setState({isRefreshing: true});
+        if (!addresses || Object.keys(addresses).length === 0) return;
 
-        var newTransactions = await getTransactionHistory(global.socketConnect, addresses, transactions);
+        this.setState({ isRefreshing: true });
 
-        if (Object.keys(newTransactions).length > 0) {
-            updateWalletValues({transactions: newTransactions, timestamp: timestamp});
-            var balance = await getBalance({...transactions, ...newTransactions});
+        try {
+            // Pull latest transactions
+            const newTransactions = await getTransactionHistory(global.socketConnect, addresses, transactions);
+            const mergedTransactions = { ...transactions, ...newTransactions };
 
-            setWalletValues({balance, timestamp});
-            this.setState({isRefreshing: false});
-        } else {
-            this.setState({isRefreshing: false});
+            updateWalletValues({ transactions: mergedTransactions, timestamp });
+
+            // ✅ Real-time balance from API
+            let totalBalance = 0;
+
+            for (const addr of Object.keys(addresses)) {
+                const res = await getAddressBalance(addr);
+
+                if (res && res.confirmed != null) {
+                    totalBalance += parseFloat(res.confirmed);
+                }
+            }
+
+            // satoshi -> MWC
+            totalBalance = totalBalance / 1e8;
+
+            setWalletValues({ balance: { confirmed: totalBalance }, timestamp });
+
+            // ✅ USD conversion (added)
+            const usd = await convertMWCtoUSD(totalBalance);
+            this.setState({ usdValue: usd });
+
+        } catch (e) {
+            console.warn("refreshHistory balance error:", e);
+            setWalletValues({ balance: { confirmed: 0 }, timestamp });
+            this.setState({ usdValue: 0 });
         }
-    }
+
+        this.setState({ isRefreshing: false });
+    };
+
+    updateBalanceUSD = async (addresses, setWalletValues, timestamp) => {
+        try {
+            let totalBalance = 0;
+
+            for (const addr of Object.keys(addresses)) {
+                const res = await getAddressBalance(addr);
+                if (res && res.confirmed != null) totalBalance += parseFloat(res.confirmed);
+            }
+
+            totalBalance = totalBalance / 1e8; // satoshi → MWC
+            setWalletValues({ balance: { confirmed: totalBalance }, timestamp });
+
+            const usd = await convertMWCtoUSD(totalBalance);
+            this.setState({ usdValue: usd });
+
+        } catch (e) {
+            console.warn("updateBalanceUSD error:", e);
+            setWalletValues({ balance: { confirmed: 0 }, timestamp });
+            this.setState({ usdValue: 0 });
+        }
+    };
 
     openTransactionDetails = (transaction, timestamp) => {
         Navigation.showModal({
@@ -174,8 +249,8 @@ class WalletScreen extends PureComponent {
                     component: {
                         name: TRANSACTION_DETAILS_SCREEN,
                         passProps: {
-                            transaction: transaction,
-                            timestamp: timestamp
+                            transaction,
+                            timestamp
                         },
                     }
                 }]
@@ -183,105 +258,118 @@ class WalletScreen extends PureComponent {
         });
     }
 
-    transformToName = (address) => {
-        const { timestamp } = this.props;
-        const { addressBook } = this.props.wallet[timestamp];
-
-        for (var i = 0; i < addressBook.length; i++) {
-            if (addressBook[i].address == address) {
-                return addressBook[i].name;
-            }
-        }
-
-        return address;
-    }
-
     renderTransaction = (transaction) => {
-        return (<View style={{padding: 10,
-                                        paddingTop: 15,
-                                        paddingBottom: 15,
-                                        backgroundColor: 'white',
-                                        alignSelf: 'center',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        width: "100%",
-                                        flexDirection: 'row',
-                                         }}>
-                    <Icon name={transaction.type ? 'circle-with-minus' : 'circle-with-plus'} type={'entypo'} size={25} style={[{marginRight: 10}, {color: "black"}]} />
-                                            <View style={{justifyContent: "flex-start",
-                                            alignItems: 'flex-start',
-                                            flexDirection: 'column',
-                                            flex: 1}}>
-                    <View style={{flexDirection: 'row'}}>
-                        <Text style={{alignSelf: 'center', fontSize: 16, fontWeight: '500', marginTop: 5}} numberOfLines={1}>
-                            {(transaction.type ? "Sent" : "Received")}
-                        </Text>
-                        <Text style={[{textAlign: 'right', alignSelf: 'center', fontSize: 16, fontWeight: 'bold', flex: 1}, {color: transaction.type ? "#d3515e" : "#71b888"}]}>
-                            {(transaction.type ? "-" : "+") + (numberWithCommas((transaction.amount/Math.pow(10, 8)).toFixed(8)))} {(Config.COIN_NAME)}
+        const amountMWC = transaction.amount / Math.pow(10, 8);
+
+        // ⚠️ you need your USD rate (assuming you stored it globally or in state)
+        const usdRate = this.state.usdValue && this.props.wallet[this.props.timestamp].balance?.confirmed
+            ? this.state.usdValue / this.props.wallet[this.props.timestamp].balance.confirmed
+            : 0;
+
+        const txUsdAmount = amountMWC * usdRate;
+
+        return (
+            <View style={{
+                padding: 10,
+                backgroundColor: 'white',
+                width: "100%",
+                flexDirection: 'row',
+            }}>
+                <Icon
+                    name={transaction.type ? 'circle-with-minus' : 'circle-with-plus'}
+                    size={25}
+                    style={{ marginRight: 10, color: "black" }}
+                />
+
+                <View style={{ flex: 1 }}>
+                    <View style={{ flexDirection: 'row' }}>
+                        <Text>{transaction.type ? "Sent" : "Received"}</Text>
+
+                        <Text style={{
+                            flex: 1,
+                            textAlign: 'right',
+                            fontWeight: 'bold',
+                            color: transaction.type ? "#d3515e" : "#71b888"
+                        }}>
+                            {(transaction.type ? "-" : "+") +
+                                numberWithCommas(amountMWC.toFixed(8))} {Config.COIN_NAME}
                         </Text>
                     </View>
-                    <View style={{flexDirection: 'row'}}>
-                        <Text style={{alignSelf: 'center', fontSize: 14, marginTop: 5, width: '60%'}} numberOfLines={1}>
-                            {transaction.hash}
-                        </Text>
-                        <Text style={{textAlign: 'right', alignSelf: 'center', fontSize: 14, opacity: 0.8, color: 'black', flex: 1}}>
-                            {moment.unix(transaction.time).format("DD MMM YYYY")}
-                        </Text>
-                    </View>
+
+                    {/* ✅ USD value goes HERE */}
+                    <Text style={{ opacity: 0.6 }}>
+                        {formatUSD(txUsdAmount)}
+                    </Text>
+
+                    <Text numberOfLines={1}>{transaction.hash}</Text>
+                    <Text>{moment.unix(transaction.time).format("DD MMM YYYY")}</Text>
                 </View>
-            </View>);
-    }
-
-    numberWithCommas = (number) => {
-            var parts = number.toString().split(".");
-            parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-
-            return parts.join(".");
-    }
+            </View>
+        );
+    };
 
     render() {
         const { timestamp } = this.props;
 
         if (!(timestamp in this.props.wallet)) {
-            return <View/>;
+            return <View />;
         }
 
         const { balance, transactions } = this.props.wallet[timestamp];
-        const { mempool, isConnected, isRefreshing } = this.state;
+        const { isConnected, isRefreshing, usdValue } = this.state;
+
+        const safeBalance = balance?.confirmed ?? 0;
 
         return (
             <View style={styles.flex}>
                 <View style={styles.balanceContainer}>
-                    <View style={{flexDirection: 'column', width: "100%"}}>
-                        {(!isRefreshing) ? <TouchableOpacity onPress={() => this.refreshHistory()}>
-                            <Text style={styles.balanceTitle} adjustsFontSizeToFit minimumFontScale={.5} numberOfLines={1}>
-                                {numberWithCommas((balance.confirmed/Math.pow(10, 8)).toFixed(8))} {Config.COIN_NAME}
-                            </Text>
+                    <View style={{ width: "100%" }}>
+                        {!isRefreshing ? (
+                            <TouchableOpacity onPress={this.refreshHistory}>
+                                <Text style={styles.balanceTitle}>
+                                    {numberWithCommas(safeBalance.toFixed(8))} {Config.COIN_NAME}
+                                </Text>
+                                {usdValue != null && (
+                                    <Text style={styles.usdValue}>
+                                        ${usdValue.toFixed(8)}
+                                    </Text>
+                                )}
+                            </TouchableOpacity>
+                        ) : (
+                            <ActivityIndicator size="small" color="white" />
+                        )}
 
-                        </TouchableOpacity> : <ActivityIndicator size="small" color="white" style={{margin: 5}} />}
-
-                        <View style={{flexDirection: "row", justifyContent: "center", alignItems: "center", marginTop: 10, marginBottom: 10}}>
-                            <Text style={[styles.balanceSubtitle, {fontSize: 12, color: 'white'}]} numberOfLines={1}>
+                        <View style={{ flexDirection: "row", justifyContent: "center", marginTop: 10 }}>
+                            <Text style={styles.balanceSubtitle}>
                                 {global.strings['wallet.networkStatusTitle']}
                             </Text>
-                            <Icon name={'controller-record'} type='entypo' size={15} style={{textAlign: 'center', marginLeft: 5, color: isConnected ? 'lightgreen' : 'red'}} />
-                        </View>
 
+                            <Icon
+                                name={'controller-record'}
+                                size={15}
+                                style={{
+                                    marginLeft: 5,
+                                    color: isConnected ? 'lightgreen' : 'red'
+                                }}
+                            />
+                        </View>
                     </View>
                 </View>
-                {(Object.keys(transactions).length == 0) && <View style={{alignSelf: 'center', width: '90%', marginTop: 10, flex: 1, justifyContent: 'flex-end'}}>
-                    <Text style={{textAlign: 'center', color: 'gray'}}>{ global.strings['wallet.empty'] } <Text style={{fontWeight: 'bold'}}>{ global.strings['wallet.emptyReceiveTab'] }</Text>.</Text>
-                </View>}
-                <ScrollView style={{width: '100%'}}>
-                    {
-                         Object.keys(transactions).sort().reverse().map((time) => (
 
-                            <TouchableOpacity onPress={() => this.openTransactionDetails(transactions[time], timestamp)} key={time}>
+                <ScrollView style={{ width: '100%' }}>
+                    {Object.keys(transactions)
+                        .sort()
+                        .reverse()
+                        .map((time) => (
+                            <TouchableOpacity
+                                key={time}
+                                onPress={() =>
+                                    this.openTransactionDetails(transactions[time], timestamp)
+                                }
+                            >
                                 {this.renderTransaction(transactions[time])}
                             </TouchableOpacity>
-
-                        ))
-                    }
+                        ))}
                 </ScrollView>
             </View>
         );

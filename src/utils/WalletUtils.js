@@ -620,7 +620,7 @@ export async function estimateFee(socketConnect, walletAddresses, options = {spe
 		// 4️⃣ Convert to coin
 		const feeCoin = feeSats / 100000000;
 
-		return feeCoin.toFixed(8);
+		return feeCoin.toFixed(6);
 
 	} catch (e) {
 		console.log("Smart fee error", e);
@@ -633,19 +633,20 @@ export async function estimateFee(socketConnect, walletAddresses, options = {spe
 export async function getMWCPrice() {
     try {
         const res = await axios.get(`${API}/price`);
-        const price = res.data.quotes?.USD?.price || 0;
-        return parseFloat(price); // returns a number like 0.00007923
+        const price = res.data.quotes?.USD?.price;
+        if (!price || isNaN(price)) return 0;
+        return parseFloat(price); // returns number like 0.000079236
     } catch (e) {
         console.log("MWC price fetch error", e);
         return 0;
     }
 }
 
-// Convert coin amount to USD
+// Convert coin amount to USD (returns number, never string)
 export async function convertMWCtoUSD(amountMWC) {
     const price = await getMWCPrice();
     const usdValue = amountMWC * price;
-    return usdValue.toFixed(6); // round to 6 decimals for readability
+    return usdValue || 0;
 }
 
 // Example usage in transaction details
@@ -653,7 +654,7 @@ export async function attachUSDValueToTx(transaction) {
     if (!transaction.amount) return transaction;
 
     const usdValue = await convertMWCtoUSD(transaction.amount);
-    return { ...transaction, usdValue };
+    return { ...transaction, usdValue }; // usdValue is number
 }
 
 // Example usage for wallet balances
@@ -663,15 +664,26 @@ export async function attachUSDValueToWallet(wallet) {
     for (const addr in wallet.addresses) {
         try {
             const res = await getAddressBalance(addr);
-            if (res && res.balance) totalBalance += parseInt(res.balance) / 1e8; // convert sats → coins
+            if (res && res.confirmed != null) {
+                totalBalance += parseFloat(res.confirmed) / 1e8; // sats → coins
+            }
         } catch (e) {
             console.log("Error fetching address balance", e);
         }
     }
 
     const usdValue = await convertMWCtoUSD(totalBalance);
-    return { ...wallet, totalBalance, usdValue };
+    return { ...wallet, totalBalance, usdValue }; // number
 }
+
+export const formatUSD = (value) => {
+    if (value == null || isNaN(value)) return "$0.00";
+
+    if (value < 0.0001) return "< $0.0001";
+    if (value < 0.01) return "$" + value.toFixed(4);
+
+    return "$" + value.toFixed(2);
+};
 
 export async function getAddressBalance(address) {
     try {
