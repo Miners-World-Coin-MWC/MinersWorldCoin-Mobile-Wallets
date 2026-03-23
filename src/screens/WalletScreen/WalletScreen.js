@@ -61,7 +61,8 @@ class WalletScreen extends PureComponent {
         super(props);
 
         this.state = {
-            isConnected: global.socketConnect?.status?.() ?? false,
+            isSocketConnected: global.socketConnect?.status?.() ?? false,
+            isApiOnline: false,
             appState: AppState.currentState,
             isRefreshing: false,
             usdValue: null
@@ -76,29 +77,40 @@ class WalletScreen extends PureComponent {
         Navigation.events().bindComponent(this);
     }
 
+    checkNetworkStatus = async () => {
+        try {
+            const res = await fetch(`${Config.API_BASE_URL}/status`); // or '/ping' if you have one
+            const isOnline = res.ok;
+            if (isOnline !== this.state.isApiOnline) {
+                this.setState({ isApiOnline: isOnline });
+            }
+        } catch (e) {
+            if (this.state.isApiOnline) this.setState({ isApiOnline: false });
+        }
+    };
+
     componentDidMount() {
         AppState.addEventListener('change', this.handleAppStateChange);
         this.firstOpen();
 
-        // ✅ SAFE polling (since no .on exists)
+        // Socket polling
         this.connectInterval = setInterval(() => {
             const currentStatus = global.socketConnect?.status?.() ?? false;
-
-            // Detect connection change
-            if (currentStatus !== this.state.isConnected) {
-                this.setState({ isConnected: currentStatus });
-
-                if (currentStatus === true) {
-                    this.refreshHistory(); // reconnect → refresh
-                }
+            if (currentStatus !== this.state.isSocketConnected) {
+                this.setState({ isSocketConnected: currentStatus });
+                if (currentStatus) this.refreshHistory();
             }
         }, 3000);
 
-        this.firstOpen();
+        // ✅ Poll the API for network status
+        this.networkInterval = setInterval(() => {
+            this.checkNetworkStatus();
+        }, 3000);
     }
 
     componentWillUnmount() {
         clearInterval(this.connectInterval);
+        clearInterval(this.networkInterval);
         AppState.removeEventListener('change', this.handleAppStateChange);
     }
 
@@ -349,7 +361,7 @@ class WalletScreen extends PureComponent {
                                 size={15}
                                 style={{
                                     marginLeft: 5,
-                                    color: isConnected ? 'lightgreen' : 'red'
+                                    color: this.state.isSocketConnected && this.state.isApiOnline ? 'red' : 'lightgreen'
                                 }}
                             />
                         </View>

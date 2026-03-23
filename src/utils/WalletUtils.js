@@ -7,6 +7,7 @@ import * as aes256 from "aes256";
 import Config from 'react-native-config';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from "axios";
+import qs from 'qs';
 const API = "https://api.minersworld.org";
 
 const hashType = bitcoin.Transaction.SIGHASH_ALL;
@@ -279,138 +280,170 @@ export async function findAddresses(socketConnect, seedPhrase, derivePath) {
     return findedAddressList;
 }
 
-export async function sendTransaction(socketConnect, walletAddresses, mainAddress, recieveAddress, amount, fee, timelock = 0) {
-	var outputsAmount = 0;
-	var keyPairs = [];
-	var scripts = [];
-	const txb = new bitcoin.TransactionBuilder(mwc);
+export async function sendTransaction(
+    socketConnect,
+    walletAddresses,
+    mainAddress,
+    recieveAddress,
+    amount,
+    fee,
+    timelock = 0
+) {
+    let outputsAmount = 0;
+    let keyPairs = [];
+    let scripts = [];
 
-	txb.setVersion(2);
+    const txb = new bitcoin.TransactionBuilder(mwc);
+    txb.setVersion(2);
 
-	for (var address in walletAddresses) {
-		try {
-			let utxo = await getUTXOs(address);
+    // 🧠 Collect UTXOs
+    for (let address in walletAddresses) {
+        try {
+            let utxo = await getUTXOs(address);
 
-			// optional but recommended (reduces tx size)
-			utxo.sort((a, b) => b.value - a.value);
+            if (!utxo || !Array.isArray(utxo)) {
+                console.log("UTXO was null, fixing...");
+                utxo = [];
+            }
 
-			for (var k = 0; k < utxo.length; k++) {
+            // largest first
+            utxo.sort((a, b) => b.value - a.value);
 
-				// ✅ correct break condition
-				if (outputsAmount >= (amount + fee)) {
-					break;
-				}
+            for (let k = 0; k < utxo.length; k++) {
 
-				var script = Buffer.from(utxo[k].script, 'hex');
-				var type = getScriptType(script);
+                if (outputsAmount >= (amount + fee)) break;
 
-				keyPairs.push(
-					bitcoin.ECPair.fromWIF(
-						walletAddresses[address].privateKey,
-						mwc
-					)
-				);
+                const script = Buffer.from(utxo[k].script, 'hex');
+                const type = getScriptType(script);
 
-				if (type == 'bech32') {
-					var p2wpkh = getP2WPKHScript(
-						keyPairs[keyPairs.length - 1].publicKey
-					);
+                const keyPair = bitcoin.ECPair.fromWIF(
+                    walletAddresses[address].privateKey,
+                    mwc
+                );
 
-					txb.addInput(
-						utxo[k].txid,
-						utxo[k].index,
-						null,
-						p2wpkh.output
-					);
-				} else {
-					txb.addInput(utxo[k].txid, utxo[k].index);
-				}
+                keyPairs.push(keyPair);
 
-				outputsAmount += parseInt(utxo[k].value);
+                if (type === 'bech32') {
+                    const p2wpkh = getP2WPKHScript(keyPair.publicKey);
 
-				scripts.push({
-					script: script,
-					type: type,
-					value: parseInt(utxo[k].value),
-				});
-			}
-		} catch (e) {
-			console.log(e);
-		}
-	}
+                    txb.addInput(
+                        utxo[k].txid,
+                        utxo[k].index,
+                        null,
+                        p2wpkh.output
+                    );
+                } else {
+                    txb.addInput(utxo[k].txid, utxo[k].index);
+                }
 
-	// ✅ correct balance check
-	if (outputsAmount < (amount + fee)) {
-		return { error: "Insufficient funds" };
-	}
+                const value = parseInt(utxo[k].value);
+                outputsAmount += value;
 
-	try {
-		const change = outputsAmount - amount - fee;
+                scripts.push({
+                    script,
+                    type,
+                    value
+                });
+            }
 
-		// ✅ safe change handling
-		if (change > 0) {
-			if (!mainAddress) {
-				return { error: "Main address error" };
-			}
-			txb.addOutput(mainAddress, change);
-		}
+            if (outputsAmount >= (amount + fee)) break;
 
-		txb.addOutput(recieveAddress, parseInt(amount));
+        } catch (e) {
+            console.log("UTXO fetch error:", e);
+        }
+    }
 
-	} catch (e) {
-		return { error: e.message };
-	}
+    if (outputsAmount < (amount + fee)) {
+        return { error: "Insufficient funds" };
+    }
 
-	// 🔐 sign inputs
-	for (var i = 0; i < scripts.length; i++) {
-		var value = scripts[i].value;
+    // 💸 Outputs
+    try {
+        const change = outputsAmount - amount - fee;
 
-		switch (scripts[i].type) {
-			case 'bech32':
-				txb.sign(i, keyPairs[i], null, null, value, null);
-				break;
+        txb.addOutput(recieveAddress, amount);
 
-			case 'segwit':
-				var redeem = getP2WPKHScript(keyPairs[i].publicKey);
-				var p2sh = getP2SHScript(redeem);
+        if (change > 0) {
+            if (!mainAddress) {
+                return { error: "Main address error" };
+            }
+            txb.addOutput(mainAddress, change);
+        }
 
-				txb.sign(i, keyPairs[i], p2sh.redeem.output, null, value, null);
-				break;
+    } catch (e) {
+        return { error: e.message };
+    }
 
-			case 'legacy':
-				txb.sign(i, keyPairs[i]);
-				break;
+    // 🔐 Sign inputs
+    for (let i = 0; i < scripts.length; i++) {
+        const value = scripts[i].value;
 
-			default:
-				console.log("error in default: ", scripts[i].type);
-				break;
-		}
-	}
+        try {
+            switch (scripts[i].type) {
+                case 'bech32':
+                    txb.sign(i, keyPairs[i], null, null, value);
+                    break;
 
-	try {
-		var tx = txb.build().toHex();
-		console.log("Transaction: ", tx);
+                case 'segwit':
+                    const redeem = getP2WPKHScript(keyPairs[i].publicKey);
+                    const p2sh = getP2SHScript(redeem);
 
-		let broadcast;
+                    txb.sign(i, keyPairs[i], p2sh.redeem.output, null, value);
+                    break;
 
-		try {
-			const res = await axios.post(`${API}/broadcast`, tx, {
-				headers: { 'Content-Type': 'text/plain' }
-			});
-			broadcast = res.data;
-		} catch (e) {
-			console.log("broadcast error", e);
-			return { error: "Broadcast failed" };
-		}
+                case 'legacy':
+                    txb.sign(i, keyPairs[i]);
+                    break;
 
-		console.log("Broadcast result: ", broadcast);
+                default:
+                    console.log("Unknown script type:", scripts[i].type);
+                    break;
+            }
+        } catch (e) {
+            console.log("Signing error:", e);
+            return { error: "Signing failed" };
+        }
+    }
 
-		return { tx: broadcast };
+    // 🚀 Build + Broadcast
+    try {
+        const txHex = txb.build().toHex();
+        console.log("Transaction HEX:", txHex);
 
-	} catch (e) {
-		console.log("Error: ", e.message);
-		return { error: e.message };
-	}
+        let broadcast;
+
+        try {
+            // Form-encoded like web wallet
+            const formData = qs.stringify({ raw: txHex });
+
+            const res = await axios.post(`${API}/broadcast`, formData, {
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+            });
+
+            broadcast = res.data;
+            console.log("Broadcast result:", broadcast);
+            console.log("TX HEX LENGTH:", txHex.length);
+            console.log("TX HEX:", txHex);
+
+        } catch (e) {
+            console.log("Broadcast error:", e?.response?.data || e.message);
+            return { error: "Broadcast failed" };
+        }
+
+        // ✅ Validate response properly
+        if (!broadcast || broadcast.error || !broadcast.result) {
+            return {
+                error: broadcast?.error?.message || "Broadcast failed"
+            };
+        }
+
+        // ✅ SUCCESS → return txid only
+        return { tx: broadcast.result };
+
+    } catch (e) {
+        console.log("Build error:", e.message);
+        return { error: e.message };
+    }
 }
 
 export async function subscribeToAddresses(socketConnect, walletAddresses, callback) {

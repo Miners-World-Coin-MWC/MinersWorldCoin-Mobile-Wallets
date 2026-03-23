@@ -193,7 +193,7 @@ class ConfirmationScreen extends PureComponent {
             {global.strings["confirmation.title"]}
           </Text>
           <Text style={{fontSize: 14, color: "white", opacity: 0.9, textAlign: 'center', marginTop: 10, width: '85%'}}>
-            {global.strings["confirmation.balanceTooltipText"]} {numberWithCommas(balance.confirmed/Math.pow(10, 8).toFixed(8))} {Config.COIN_NAME}
+            {global.strings["confirmation.balanceTooltipText"]} {numberWithCommas(balance.confirmed.toFixed(8))} {Config.COIN_NAME}
           </Text>
 
           <View style={{flexDirection: "row", marginTop: 10, width: "90%", justifyContent: 'space-between', alignItems: 'center'}}>
