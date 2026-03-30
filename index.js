@@ -24,7 +24,9 @@ if (Platform.OS === 'android') {
 LogBox.ignoreLogs([
   'Setting a timer',
   'Require cycle:',
-  'AsyncStorage has been extracted from react-native core'
+  'AsyncStorage has been extracted from react-native core',
+  'ViewPropTypes will be removed',
+  'ColorPropType will be removed',
 ]);
 
 global.strings = new LocalizedStrings(languages);

@@ -304,13 +304,13 @@ class SettingsScreen extends PureComponent {
         ]
 
         const secondSection = [
-            {
-                title: global.strings['settings.importWIF'],
-                icon: 'key',
-                subtitle: null,
+            // {
+            //     title: global.strings['settings.importWIF'],
+            //     icon: 'key',
+            //     subtitle: null,
 
-                onPress: () => this.openWIFImport()
-            },
+            //     onPress: () => this.openWIFImport()
+            // },
             {
                 title: global.strings['settings.changePassword'],
                 icon: 'unlock',

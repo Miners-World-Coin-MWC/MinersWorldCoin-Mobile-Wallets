@@ -3,16 +3,14 @@ apply plugin: "kotlin-android"
 apply from: project(':react-native-config').projectDir.getPath() + "/dotenv.gradle"
 
 project.ext.react = [
-        enableHermes: false,  // clean and rebuild if changing
+    enableHermes: false,
 ]
 
 apply from: "../../node_modules/react-native/react.gradle"
 
 def enableSeparateBuildPerCPUArchitecture = false
 def enableProguardInReleaseBuilds = false
-
-def jscFlavor = 'org.webkit:android-jsc:+' // fallback if Hermes is off
-
+def jscFlavor = 'org.webkit:android-jsc:+'
 def enableHermes = project.ext.react.get("enableHermes", false)
 
 android {
@@ -52,6 +50,12 @@ android {
             keyAlias 'androiddebugkey'
             keyPassword 'android'
         }
+        release {
+            storeFile file('debug.keystore')
+            storePassword 'android'
+            keyAlias 'androiddebugkey'
+            keyPassword 'android'
+        }
     }
 
     buildTypes {
@@ -59,8 +63,8 @@ android {
             signingConfig signingConfigs.debug
         }
         release {
-            signingConfig signingConfigs.debug
-            minifyEnabled enableProguardInReleaseBuilds
+            signingConfig signingConfigs.release
+            minifyEnabled false
             proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
         }
     }
@@ -75,10 +79,7 @@ android {
 
 dependencies {
     implementation fileTree(dir: "libs", include: ["*.jar"])
-
-    // React Native
-    implementation "com.facebook.react:react-native:+"
-
+    implementation "com.facebook.react:react-native:0.68.5"
     implementation "androidx.swiperefreshlayout:swiperefreshlayout:1.0.0"
     implementation "androidx.multidex:multidex:2.0.1"
 

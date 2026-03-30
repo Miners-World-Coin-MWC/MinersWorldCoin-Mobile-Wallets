@@ -73,15 +73,22 @@ function setDefaultValues(state, payload) {
 }
 
 function updateWalletValues(state, payload) {
-    let newState = {...state};
-    let newWalletState = newState[payload.timestamp];
-    const keys = Object.keys(payload);
+    const { timestamp, ...updates } = payload;
 
-    for (var i = 0; i < keys.length; i++) {
-        newWalletState = {...newWalletState, [keys[i]]: {...newWalletState[keys[i]], ...payload[keys[i]]}};
-    }
+    let newState = { ...state };
 
-    newState[payload.timestamp] = newWalletState;
+    // ✅ ensure wallet exists
+    let existingWallet = newState[timestamp] || {
+        ...WALLET
+    };
+
+    // ✅ merge safely (NO nested spreading madness)
+    let newWalletState = {
+        ...existingWallet,
+        ...updates
+    };
+
+    newState[timestamp] = newWalletState;
 
     return newState;
 }

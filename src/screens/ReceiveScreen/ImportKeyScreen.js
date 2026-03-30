@@ -93,44 +93,101 @@ class ImportKeyScreen extends PureComponent {
         const { wif } = this.state;
         const { updateWalletValues, setWalletValues } = this.props;
         const { addresses, timestamp, transactions } = this.props.wallet;
+
+        const safeAddresses = (addresses && typeof addresses === 'object') ? addresses : {};
+        const safeTransactions = (transactions && typeof transactions === 'object') ? transactions : {};
+
         let importedAddress = importAddressByWIF(wif);
 
-        if (isAddress(importedAddress) && !(importedAddress in addresses)) {
-            let address = {[importedAddress]: {index: 0, privateKey: wif}};
+        // ✅ HARD STOP if invalid WIF
+        if (!importedAddress) {
+            Alert.alert(
+                global.strings['importKey.title'],
+                "Invalid private key (WIF)",
+                [{ text: "OK" }]
+            );
+            return;
+        }
 
-            updateWalletValues({addresses: address, timestamp: timestamp});
-            setWalletValues({receiveAddress: importedAddress, timestamp: timestamp});
+        // ✅ DUPLICATE CHECK
+        if (importedAddress in safeAddresses) {
+            Alert.alert(
+                global.strings['importKey.title'],
+                "Address already exists in wallet",
+                [{ text: "OK" }]
+            );
+            return;
+        }
 
-            getTransactionHistory(global.socketConnect, {...addresses, ...address}, transactions).then((newTransactions) => {
-                updateWalletValues({transactions: newTransactions, timestamp: timestamp});
+        // ✅ VALID ADDRESS CHECK
+        if (!isAddress(importedAddress)) {
+            Alert.alert(
+                global.strings['importKey.title'],
+                "Invalid address derived from key",
+                [{ text: "OK" }]
+            );
+            return;
+        }
 
-                getBalance({...transactions, ...newTransactions}).then((balance) => {
-                    setWalletValues({balance, timestamp});
-                })
-            })
+        const address = {
+            [importedAddress]: {
+                index: 0,
+                privateKey: wif
+            }
+        };
+
+        const mergedAddresses = { ...safeAddresses, ...address };
+
+        try {
+            // ✅ ALWAYS MERGE — never overwrite
+            updateWalletValues({
+                addresses: mergedAddresses,
+                timestamp
+            });
+
+            setWalletValues({
+                receiveAddress: importedAddress,
+                timestamp
+            });
+
+            const newTransactions = await getTransactionHistory(
+                global.socketConnect,
+                mergedAddresses,
+                safeTransactions
+            );
+
+            updateWalletValues({
+                transactions: newTransactions || {},
+                timestamp
+            });
+
+            const balance = await getBalance({
+                ...safeTransactions,
+                ...(newTransactions || {})
+            });
+
+            setWalletValues({
+                balance: balance || 0,
+                timestamp
+            });
 
             Alert.alert(
                 global.strings['importKey.title'],
                 global.strings['importKey.successAlert'],
-                [
-                    {
-                        text: global.strings['importKey.confirmAlertButton'],
-                        onPress: () => this.cancel(),
-                    },
-                ],
-                {cancelable: false},
+                [{
+                    text: global.strings['importKey.confirmAlertButton'],
+                    onPress: () => this.cancel(),
+                }],
+                { cancelable: false }
             );
 
-        } else {
+        } catch (err) {
+            console.log("IMPORT FLOW ERROR:", err);
+
             Alert.alert(
-                global.strings['importKey.title'],
-                global.strings['importKey.importErrorAlert'],
-                [
-                    {
-                        text: global.strings['importKey.confirmAlertButton'],
-                    },
-                ],
-                {cancelable: false},
+                "Error",
+                "Failed to import key. Check logs.",
+                [{ text: "OK" }]
             );
         }
     }

@@ -11538,10 +11538,10 @@ react-native-localization@^2.1.5:
   dependencies:
     react-localization "^1.0.17"
 
-react-native-navigation@7.28.0:
-  version "7.28.0"
-  resolved "https://registry.npmjs.org/react-native-navigation/-/react-native-navigation-7.28.0.tgz#536942995f24b78a33b5b6e5e6e42f269cf72167"
-  integrity sha512-rHLuJLzheUY5JYP0UuuNNz5f3yh3kmmwj+sZIQyDh+WksJqtREgmTqxuSs2X8SnE5QoEcm5WsNuw3P9HuyWbJw==
+react-native-navigation@7.33.0:
+  version "7.33.0"
+  resolved "https://registry.npmjs.org/react-native-navigation/-/react-native-navigation-7.33.0.tgz#40cf314bce895f8823404940d8ca7822c08698b9"
+  integrity sha512-mUqrAz1nHZMuF5sm8PiPWsM/G2X7Ah828ANf+hAR8ee8K8HzL3YYO3eoGsMrS8XYElmBvFtcijNI8+6VipbZkQ==
   dependencies:
     hoist-non-react-statics "3.x.x"
     lodash "4.17.x"

@@ -1,13 +1,11 @@
-// Top-level build file where you can add configuration options common to all sub-projects/modules.
-
 buildscript {
     ext {
-        RNNKotlinVersion = "1.6.21"
-        buildToolsVersion = "31.0.0" // updated to match compileSdkVersion
+        RNNKotlinVersion = "1.8.22"
+        buildToolsVersion = "33.0.3"
         reactNativeVersion = "0.68.5"
         minSdkVersion = 21
-        compileSdkVersion = 31 // RN 0.68 recommends 31
-        targetSdkVersion = 31
+        compileSdkVersion = 33
+        targetSdkVersion = 33
         ndkVersion = "21.4.7075529"
     }
     repositories {
@@ -18,9 +16,7 @@ buildscript {
     }
     dependencies {
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:${RNNKotlinVersion}"
-        classpath "com.android.tools.build:gradle:7.2.2"
-        // NOTE: Do not place your application dependencies here; they belong
-        // in the individual module build.gradle files
+        classpath "com.android.tools.build:gradle:7.4.2"
     }
 }
 
