@@ -38,6 +38,7 @@
     "identicon.js": "^2.3.3",
     "intl": "^1.2.5",
     "lodash": "^4.17.11",
+    "metro-react-native-babel-preset": "0.67.0",
     "moment": "^2.24.0",
     "node-libs-browser": "^2.2.1",
     "path-browserify": "0.0.0",
@@ -46,8 +47,8 @@
     "punycode": "^1.4.1",
     "qs": "^6.15.0",
     "querystring-es3": "^0.2.1",
-    "react": "17.0.1",
-    "react-native": "0.64.4",
+    "react": "17.0.2",
+    "react-native": "0.68.5",
     "react-native-app-link": "^1.0.0",
     "react-native-camera": "1.2.0",
     "react-native-config": "^0.12.0",
@@ -58,7 +59,7 @@
     "react-native-level-fs": "^3.0.1",
     "react-native-linear-gradient": "^2.5.6",
     "react-native-localization": "^2.1.5",
-    "react-native-navigation": "6.9.0",
+    "react-native-navigation": "7.28.0",
     "react-native-os": "^1.2.4",
     "react-native-permissions": "^2.0.9",
     "react-native-picker-select": "^6.3.0",
@@ -121,15 +122,8 @@
     "jest-enzyme": "7.0.1",
     "jest-repl": "23.6.0",
     "jetifier": "^1.6.5",
-    "metro-react-native-babel-preset": "0.64.0",
     "react-test-renderer": "16.13.1",
     "schedule": "0.4.0"
-  },
-  "resolutions": {
-    "metro": "0.66.2",
-    "metro-core": "0.66.2",
-    "metro-config": "0.66.2",
-    "metro-resolver": "0.66.2"
   },
   "jest": {
     "preset": "react-native",
