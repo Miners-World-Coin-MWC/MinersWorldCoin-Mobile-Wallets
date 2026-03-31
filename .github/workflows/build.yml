@@ -99,6 +99,23 @@ jobs:
             s.platforms = { :ios => '11.0' }\n\
           end\n" > "$SPEC_DIR/Folly.podspec"
 
+      - name: Fix missing RCT-Folly podspec
+        run: |
+          SPEC_DIR="node_modules/react-native/third-party-podspecs"
+          mkdir -p "$SPEC_DIR"
+
+          printf "Pod::Spec.new do |s|\n\
+            s.name = 'RCT-Folly'\n\
+            s.version = '2021.06.28.00-v2'\n\
+            s.summary = 'RCT-Folly for React Native'\n\
+            s.homepage = 'https://github.com/facebook/folly'\n\
+            s.license = { :type => 'BSD' }\n\
+            s.author = 'Facebook'\n\
+            s.source = { :git => 'https://github.com/facebook/folly.git', :tag => 'v2021.06.28.00' }\n\
+            s.source_files = 'folly/**/*.{h,cpp}'\n\
+            s.platforms = { :ios => '11.0' }\n\
+          end\n" > "$SPEC_DIR/RCT-Folly.podspec"
+
       - name: Install CocoaPods
         run: |
           cd ios
