@@ -77,17 +77,16 @@ jobs:
           yarn install --ignore-engines
           yarn jetifier
 
-      - name: Fix CocoaPods version (RN 0.68 compatibility)
+      - name: Fix CocoaPods (Ruby 3.3 compatibility)
         run: |
-          sudo gem uninstall cocoapods -a -x || true
-          sudo gem install cocoapods -v 1.13.0
+          sudo gem install cocoapods -v 1.16.2
           pod repo update
 
       - name: Install CocoaPods
         run: |
           cd ios
           rm -rf Pods Podfile.lock
-          pod install --repo-update
+          pod install --clean-install
 
       - name: Build iOS (unsigned)
         run: |
