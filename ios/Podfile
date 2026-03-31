@@ -5,11 +5,6 @@ require_relative '../node_modules/@react-native-community/cli-platform-ios/nativ
 target 'MinersWorldCoin' do
   config = use_native_modules!
 
-  use_frameworks! :linkage => :static
-
-  # Let React Native handle its own pods
-  use_native_modules!
-
   # Permissions
   permissions_path = '../node_modules/react-native-permissions/ios'
 
@@ -18,7 +13,12 @@ target 'MinersWorldCoin' do
   pod 'Permission-MediaLibrary', :path => "#{permissions_path}/MediaLibrary.podspec"
   pod 'Permission-PhotoLibrary', :path => "#{permissions_path}/PhotoLibrary.podspec"
 
-  # Vector icons (manual is fine)
+  # Legacy RN subspecs required by older libs
+  pod 'React-RCTImage', :path => '../node_modules/react-native/Libraries/Image'
+  pod 'React-RCTText', :path => '../node_modules/react-native/Libraries/Text'
+  pod 'React-RCTNetwork', :path => '../node_modules/react-native/Libraries/Network'
+
+  # Vector icons
   pod 'RNVectorIcons', :path => '../node_modules/react-native-vector-icons'
 
   target 'MinersWorldCoinTests' do
