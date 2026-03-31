@@ -82,39 +82,39 @@ jobs:
           sudo gem install cocoapods -v 1.16.2
           pod repo update
 
-      - name: Fix missing Folly podspec
-        run: |
-          SPEC_DIR="node_modules/react-native/third-party-podspecs"
-          mkdir -p "$SPEC_DIR"
+      # - name: Fix missing Folly podspec
+      #   run: |
+      #     SPEC_DIR="node_modules/react-native/third-party-podspecs"
+      #     mkdir -p "$SPEC_DIR"
 
-          printf "Pod::Spec.new do |s|\n\
-            s.name = 'Folly'\n\
-            s.version = '2021.07.22.00'\n\
-            s.summary = 'Folly'\n\
-            s.homepage = 'https://github.com/facebook/folly'\n\
-            s.license = { :type => 'Apache 2.0' }\n\
-            s.author = 'Facebook'\n\
-            s.source = { :git => 'https://github.com/facebook/folly.git', :tag => 'v2021.07.22.00' }\n\
-            s.source_files = 'folly/**/*.{h,cpp}'\n\
-            s.platforms = { :ios => '11.0' }\n\
-          end\n" > "$SPEC_DIR/Folly.podspec"
+      #     printf "Pod::Spec.new do |s|\n\
+      #       s.name = 'Folly'\n\
+      #       s.version = '2021.07.22.00'\n\
+      #       s.summary = 'Folly'\n\
+      #       s.homepage = 'https://github.com/facebook/folly'\n\
+      #       s.license = { :type => 'Apache 2.0' }\n\
+      #       s.author = 'Facebook'\n\
+      #       s.source = { :git => 'https://github.com/facebook/folly.git', :tag => 'v2021.07.22.00' }\n\
+      #       s.source_files = 'folly/**/*.{h,cpp}'\n\
+      #       s.platforms = { :ios => '11.0' }\n\
+      #     end\n" > "$SPEC_DIR/Folly.podspec"
 
-      - name: Fix missing RCT-Folly podspec
-        run: |
-          SPEC_DIR="node_modules/react-native/third-party-podspecs"
-          mkdir -p "$SPEC_DIR"
+      # - name: Fix missing RCT-Folly podspec
+      #   run: |
+      #     SPEC_DIR="node_modules/react-native/third-party-podspecs"
+      #     mkdir -p "$SPEC_DIR"
 
-          printf "Pod::Spec.new do |s|\n\
-            s.name = 'RCT-Folly'\n\
-            s.version = '2021.06.28.00-v2'\n\
-            s.summary = 'RCT-Folly for React Native'\n\
-            s.homepage = 'https://github.com/facebook/folly'\n\
-            s.license = { :type => 'BSD' }\n\
-            s.author = 'Facebook'\n\
-            s.source = { :git => 'https://github.com/facebook/folly.git', :tag => 'v2021.06.28.00' }\n\
-            s.source_files = 'folly/**/*.{h,cpp}'\n\
-            s.platforms = { :ios => '11.0' }\n\
-          end\n" > "$SPEC_DIR/RCT-Folly.podspec"
+      #     printf "Pod::Spec.new do |s|\n\
+      #       s.name = 'RCT-Folly'\n\
+      #       s.version = '2021.06.28.00-v2'\n\
+      #       s.summary = 'RCT-Folly for React Native'\n\
+      #       s.homepage = 'https://github.com/facebook/folly'\n\
+      #       s.license = { :type => 'BSD' }\n\
+      #       s.author = 'Facebook'\n\
+      #       s.source = { :git => 'https://github.com/facebook/folly.git', :tag => 'v2021.06.28.00' }\n\
+      #       s.source_files = 'folly/**/*.{h,cpp}'\n\
+      #       s.platforms = { :ios => '11.0' }\n\
+      #     end\n" > "$SPEC_DIR/RCT-Folly.podspec"
 
       - name: Install CocoaPods
         run: |
