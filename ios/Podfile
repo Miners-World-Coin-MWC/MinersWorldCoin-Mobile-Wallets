@@ -40,6 +40,7 @@ target 'MinersWorldCoin' do
   pod 'DoubleConversion', :path => '../node_modules/react-native/third-party-podspecs/DoubleConversion.podspec'
   pod 'glog', :path => '../node_modules/react-native/third-party-podspecs/glog.podspec'
   pod 'Folly', :path => '../node_modules/react-native/third-party-podspecs/Folly.podspec'
+  pod 'RCT-Folly', :path => '../node_modules/react-native/third-party-podspecs/RCT-Folly.podspec'
 
   pod 'RNVectorIcons', :path => '../node_modules/react-native-vector-icons'
 
