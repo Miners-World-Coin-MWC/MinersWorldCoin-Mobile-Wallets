@@ -3,7 +3,6 @@ platform :ios, '11.0'
 require_relative '../node_modules/react-native/scripts/react_native_pods'
 require_relative '../node_modules/@react-native-community/cli-platform-ios/native_modules'
 
-
 target 'MinersWorldCoin' do
   config = use_native_modules!
 
@@ -12,7 +11,6 @@ target 'MinersWorldCoin' do
     :hermes_enabled => false
   )
 
-  # Permissions
   permissions_path = '../node_modules/react-native-permissions/ios'
 
   pod 'Permission-Camera', :path => "#{permissions_path}/Camera.podspec"
@@ -20,7 +18,7 @@ target 'MinersWorldCoin' do
   pod 'Permission-MediaLibrary', :path => "#{permissions_path}/MediaLibrary.podspec"
   pod 'Permission-PhotoLibrary', :path => "#{permissions_path}/PhotoLibrary.podspec"
 
-  # 🔥 Force local boost podspec (prevents CDN mismatch)
+  # 🔥 THIS is the fix
   pod 'boost', :path => '../node_modules/react-native/third-party-podspecs'
 
   target 'MinersWorldCoinTests' do
