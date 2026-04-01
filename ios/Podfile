@@ -3,6 +3,25 @@ platform :ios, '11.0'
 require_relative '../node_modules/react-native/scripts/react_native_pods'
 require_relative '../node_modules/@react-native-community/cli-platform-ios/native_modules'
 
+pre_install do |installer|
+  Pod::UI.puts "Fixing Boost checksum issue..."
+
+  boost_spec_path = File.join(__dir__, '../node_modules/react-native/third-party-podspecs/boost.podspec')
+
+  if File.exist?(boost_spec_path)
+    contents = File.read(boost_spec_path)
+
+    contents.gsub!(
+      /:sha256 => '.*'/,
+      ":sha256 => 'f0397ba6e982c4450f27bf32a2a83292aba035b827a5623a14636ea583318c41'"
+    )
+
+    File.write(boost_spec_path, contents)
+  else
+    Pod::UI.puts "Boost podspec not found!"
+  end
+end
+
 target 'MinersWorldCoin' do
   config = use_native_modules!
 
@@ -18,6 +37,9 @@ target 'MinersWorldCoin' do
   pod 'Permission-FaceID', :path => "#{permissions_path}/FaceID.podspec"
   pod 'Permission-MediaLibrary', :path => "#{permissions_path}/MediaLibrary.podspec"
   pod 'Permission-PhotoLibrary', :path => "#{permissions_path}/PhotoLibrary.podspec"
+
+  # 🔥 Force local boost podspec (prevents CDN mismatch)
+  pod 'boost', :podspec => '../node_modules/react-native/third-party-podspecs/boost.podspec'
 
   target 'MinersWorldCoinTests' do
     inherit! :complete

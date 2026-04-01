@@ -82,21 +82,11 @@ jobs:
           sudo gem install cocoapods -v 1.16.2
           pod repo update
 
-      - name: Install CocoaPods (stable method)
+      - name: Install CocoaPods
         run: |
           cd ios
-
-          # FULL reset (this is the important part)
           rm -rf Pods Podfile.lock
-          rm -rf ~/Library/Caches/CocoaPods
-          rm -rf ~/.cocoapods
-
-          # Use git-based spec repo instead of CDN (fixes checksum mismatch)
-          pod repo remove trunk || true
-          pod setup
-
-          # Install with repo update
-          pod install --repo-update
+          pod install --clean-install
 
       - name: Build iOS (unsigned)
         run: |
