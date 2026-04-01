@@ -82,6 +82,14 @@ jobs:
           sudo gem install cocoapods -v 1.16.2
           pod repo update
 
+      - name: Vendor Boost locally (fix checksum issue permanently)
+        run: |
+          mkdir -p ios/vendor/boost
+          cd ios/vendor/boost
+
+          curl -L https://archives.boost.io/release/1.76.0/source/boost_1_76_0.tar.bz2 -o boost.tar.bz2
+          tar -xjf boost.tar.bz2
+
       - name: Install CocoaPods
         run: |
           cd ios
