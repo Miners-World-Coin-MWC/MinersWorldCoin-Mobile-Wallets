@@ -17,7 +17,7 @@
                BlueprintIdentifier = "13B07F861A680F5B00A75B9A"
                BuildableName = "MinersWorldCoin.app"
                BlueprintName = "MinersWorldCoin"
-               ReferencedContainer = "container:AOK Wallet.xcodeproj">
+               ReferencedContainer = "container:MWC Wallet.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -35,7 +35,7 @@
                BlueprintIdentifier = "00E356ED1AD99517003FC87E"
                BuildableName = "MinersWorldCoinTests.xctest"
                BlueprintName = "MinersWorldCoinTests"
-               ReferencedContainer = "container:AOK Wallet.xcodeproj">
+               ReferencedContainer = "container:MWC Wallet.xcodeproj">
             </BuildableReference>
          </TestableReference>
       </Testables>
@@ -66,7 +66,7 @@
             BlueprintIdentifier = "13B07F861A680F5B00A75B9A"
             BuildableName = "MinersWorldCoin.app"
             BlueprintName = "MinersWorldCoin"
-            ReferencedContainer = "container:AOK Wallet.xcodeproj">
+            ReferencedContainer = "container:MWC Wallet.xcodeproj">
          </BuildableReference>
       </MacroExpansion>
    </LaunchAction>
@@ -83,7 +83,7 @@
             BlueprintIdentifier = "13B07F861A680F5B00A75B9A"
             BuildableName = "MinersWorldCoin.app"
             BlueprintName = "MinersWorldCoin"
-            ReferencedContainer = "container:AOK Wallet.xcodeproj">
+            ReferencedContainer = "container:MWC Wallet.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </ProfileAction>
