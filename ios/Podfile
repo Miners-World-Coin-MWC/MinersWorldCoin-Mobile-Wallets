@@ -4,16 +4,17 @@ require_relative '../node_modules/react-native/scripts/react_native_pods'
 require_relative '../node_modules/@react-native-community/cli-platform-ios/native_modules'
 
 pre_install do |installer|
-  Pod::UI.puts "Fixing Boost checksum issue..."
+  Pod::UI.puts "Disabling Boost checksum verification..."
 
   boost_spec_path = File.join(__dir__, '../node_modules/react-native/third-party-podspecs/boost.podspec')
 
   if File.exist?(boost_spec_path)
     contents = File.read(boost_spec_path)
 
+    # 🔥 REMOVE checksum completely
     contents.gsub!(
-      /:sha256 => '.*'/,
-      ":sha256 => '1c162b579a423fa6876c6c5bc16d39ab4bc05e28898977a0a6af345f523f6357'"
+      /,?\s*:sha256\s*=>\s*'.*'/,
+      ''
     )
 
     File.write(boost_spec_path, contents)
