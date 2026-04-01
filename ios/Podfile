@@ -20,6 +20,8 @@ target 'MinersWorldCoin' do
 
   pod 'RCTTypeSafety', :path => '../node_modules/react-native/Libraries/TypeSafety'
   pod 'RCTRequired', :path => '../node_modules/react-native/Libraries/RCTRequired'
+  pod 'ReactCommon/turbomodule/core', :path => '../node_modules/react-native/ReactCommon'
+  pod 'ReactCommon/callinvoker', :path => '../node_modules/react-native/ReactCommon'
   pod 'RCT-Folly', :path => '../node_modules/react-native/third-party-podspecs/RCT-Folly.podspec'
 
   # Vector icons
