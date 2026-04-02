@@ -61,17 +61,11 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Accept Xcode license
-        run: sudo xcodebuild -license accept
+      - name: List installed Xcodes
+        run: ls /Applications | grep Xcode
 
-      - name: Install Xcode 14.3
-        run: |
-          brew uninstall xcodes || true
-          brew tap xcodesorg/made
-          brew install xcodes
-
-          xcodes install 14.3
-          sudo xcode-select -s /Applications/Xcode-14.3.app
+      - name: Select available Xcode
+        run: sudo xcode-select -s /Applications/Xcode.app
 
       - name: Setup Node
         uses: actions/setup-node@v4
