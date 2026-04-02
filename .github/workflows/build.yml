@@ -108,15 +108,22 @@ jobs:
 
             cd ../../
 
-            echo "➡️ Patching Podfile..."
-
+            echo "➡️ Patching Podfile safely with AWK..."
+            
             # Remove any existing boost lines
             sed -i '' '/pod.*boost/d' Podfile
 
-            # SAFE insertion (no YAML break)
-            sed -i '' "/use_react_native!/a\\
-            pod 'boost', :path => './vendor/boost/boost_1_76_0'
-            " Podfile
+            # Insert boost AFTER use_react_native block (safe)
+            awk '
+            /use_react_native!\(/ { inBlock=1 }
+            inBlock && /\)/ {
+              print
+              print "  pod '\''boost'\'', :path => '\''./vendor/boost/boost_1_76_0'\''"
+              inBlock=0
+              next
+            }
+            { print }
+            ' Podfile > Podfile.tmp && mv Podfile.tmp Podfile
 
             echo "➡️ Re-running pod install..."
             pod install --repo-update
