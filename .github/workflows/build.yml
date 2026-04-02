@@ -100,6 +100,9 @@ jobs:
           if [ $STATUS -ne 0 ]; then
             echo "⚠️ Pod install failed, applying Boost fallback..."
 
+            # Remove the node_modules Boost podspec to prevent conflicts
+            rm -f ../node_modules/react-native/third-party-podspecs/boost.podspec
+
             mkdir -p vendor/boost
             cd vendor/boost
 
@@ -109,7 +112,7 @@ jobs:
             cd ../../
 
             echo "➡️ Patching Podfile safely with AWK..."
-            
+
             # Remove any existing boost lines
             sed -i '' '/pod.*boost/d' Podfile
 
