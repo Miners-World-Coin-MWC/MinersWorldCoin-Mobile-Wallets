@@ -93,50 +93,45 @@ jobs:
 
           set +e
 
-          echo "➡️ Attempting normal pod install..."
+          echo "➡️ Backing up node_modules Boost podspec..."
+          if [ -f ../node_modules/react-native/third-party-podspecs/boost.podspec ]; then
+            mv ../node_modules/react-native/third-party-podspecs/boost.podspec ../node_modules/react-native/third-party-podspecs/boost.podspec.bak
+          fi
+
+          echo "➡️ Attempting pod install with fallback Boost..."
+          
+          mkdir -p vendor/boost
+          cd vendor/boost
+          curl -L https://archives.boost.io/release/1.76.0/source/boost_1_76_0.tar.bz2 -o boost.tar.bz2
+          tar -xjf boost.tar.bz2
+          cd ../../
+
+          # Remove any existing boost lines
+          sed -i '' '/pod.*boost/d' Podfile
+
+          # Insert boost AFTER use_react_native block (safe)
+          awk '
+          /use_react_native!\(/ { inBlock=1 }
+          inBlock && /\)/ {
+            print
+            print "  pod '\''boost'\'', :path => '\''./vendor/boost/boost_1_76_0'\''"
+            inBlock=0
+            next
+          }
+          { print }
+          ' Podfile > Podfile.tmp && mv Podfile.tmp Podfile
+
+          echo "➡️ Running pod install..."
           pod install --repo-update
-          STATUS=$?
 
-          if [ $STATUS -ne 0 ]; then
-            echo "⚠️ Pod install failed, applying Boost fallback..."
+          if [ $? -ne 0 ]; then
+            echo "❌ Pod install failed even after Boost fallback"
+            exit 1
+          fi
 
-            # Remove the node_modules Boost podspec to prevent conflicts
-            rm -f ../node_modules/react-native/third-party-podspecs/boost.podspec
-
-            mkdir -p vendor/boost
-            cd vendor/boost
-
-            curl -L https://archives.boost.io/release/1.76.0/source/boost_1_76_0.tar.bz2 -o boost.tar.bz2
-            tar -xjf boost.tar.bz2
-
-            cd ../../
-
-            echo "➡️ Patching Podfile safely with AWK..."
-
-            # Remove any existing boost lines
-            sed -i '' '/pod.*boost/d' Podfile
-
-            # Insert boost AFTER use_react_native block (safe)
-            awk '
-            /use_react_native!\(/ { inBlock=1 }
-            inBlock && /\)/ {
-              print
-              print "  pod '\''boost'\'', :path => '\''./vendor/boost/boost_1_76_0'\''"
-              inBlock=0
-              next
-            }
-            { print }
-            ' Podfile > Podfile.tmp && mv Podfile.tmp Podfile
-
-            echo "➡️ Re-running pod install..."
-            pod install --repo-update
-
-            if [ $? -ne 0 ]; then
-              echo "❌ Pod install failed even after Boost fix"
-              exit 1
-            fi
-          else
-            echo "✅ Pod install succeeded normally"
+          # Restore original podspec just in case for future runs
+          if [ -f ../node_modules/react-native/third-party-podspecs/boost.podspec.bak ]; then
+            mv ../node_modules/react-native/third-party-podspecs/boost.podspec.bak ../node_modules/react-native/third-party-podspecs/boost.podspec
           fi
 
       - name: Build iOS (unsigned)
