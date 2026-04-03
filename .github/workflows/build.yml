@@ -118,6 +118,18 @@ jobs:
           end
           EOF
 
+      - name: Fix Yoga for Xcode 15
+        run: |
+          FILE="node_modules/react-native/ReactCommon/yoga/yoga/Yoga.cpp"
+
+          if [ -f "$FILE" ]; then
+            echo "Patching Yoga.cpp for Xcode 15 compatibility..."
+            sed -i '' 's/hadOverflow() |/hadOverflow() ||/g' $FILE
+          else
+            echo "Yoga.cpp not found!"
+            exit 1
+          fi
+
       - name: Install Pods
         run: |
           cd ios
