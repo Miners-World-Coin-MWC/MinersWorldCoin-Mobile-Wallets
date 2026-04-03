@@ -110,7 +110,7 @@ jobs:
             s.author   = { 'Boost' => 'boost@lists.boost.org' }
 
             s.source = {
-              :http => 'file://$BOOST_PATH'
+              :http => "file://$(pwd)/ios/vendor/boost/boost_1_76_0.tar.bz2"
             }
 
             s.header_dir = 'boost'
