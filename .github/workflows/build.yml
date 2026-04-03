@@ -115,6 +115,12 @@ jobs:
 
             s.header_dir = 'boost'
             s.source_files = 'boost/**/*.hpp'
+
+            s.pod_target_xcconfig = {
+              'CLANG_CXX_LANGUAGE_STANDARD' => 'c++17',
+              'CLANG_CXX_LIBRARY' => 'libc++',
+              'GCC_PREPROCESSOR_DEFINITIONS' => 'BOOST_NO_CXX11_CONSTEXPR'
+            }
           end
           EOF
 
