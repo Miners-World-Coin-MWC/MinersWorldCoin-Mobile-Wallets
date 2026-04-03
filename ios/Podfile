@@ -18,9 +18,6 @@ target 'MinersWorldCoin' do
   pod 'Permission-MediaLibrary', :path => "#{permissions_path}/MediaLibrary.podspec"
   pod 'Permission-PhotoLibrary', :path => "#{permissions_path}/PhotoLibrary.podspec"
 
-  # ✅ YOUR ONLY BOOST SOURCE
-  pod 'boost', :path => './vendor/boost/boost_1_76_0'
-
   target 'MinersWorldCoinTests' do
     inherit! :complete
   end
