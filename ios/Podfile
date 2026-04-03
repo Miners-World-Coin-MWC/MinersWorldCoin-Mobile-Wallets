@@ -3,19 +3,16 @@ platform :ios, '11.0'
 require_relative '../node_modules/react-native/scripts/react_native_pods'
 require_relative '../node_modules/@react-native-community/cli-platform-ios/native_modules'
 
-# pre_install do |installer|
-#   Pod::UI.puts "Redirecting Boost to local vendor..."
+# 🔥 Kill broken RN Boost BEFORE CocoaPods sees it
+pre_install do |installer|
+  Pod::UI.puts "🔥 Removing RN boost podspec (fix checksum issue)"
 
-#   installer.pod_targets.each do |pod|
-#     if pod.name == 'boost'
-#       def pod.podspec
-#         Pod::Specification.from_file(
-#           File.join(__dir__, 'vendor/boost/boost_1_76_0/boost.podspec')
-#         )
-#       end
-#     end
-#   end
-# end
+  boost_path = File.join(__dir__, '../node_modules/react-native/third-party-podspecs/boost.podspec')
+
+  if File.exist?(boost_path)
+    File.delete(boost_path)
+  end
+end
 
 target 'MinersWorldCoin' do
   config = use_native_modules!
@@ -32,8 +29,8 @@ target 'MinersWorldCoin' do
   pod 'Permission-MediaLibrary', :path => "#{permissions_path}/MediaLibrary.podspec"
   pod 'Permission-PhotoLibrary', :path => "#{permissions_path}/PhotoLibrary.podspec"
 
-  # 🔥 HARD OVERRIDE (no checksum, no CDN)
-  # pod 'boost', :path => './vendor/boost/boost_1_76_0'
+  # 🔥 FORCE LOCAL BOOST (YOU MUST HAVE THIS FOLDER COMMITTED)
+  pod 'boost', :path => './vendor/boost/boost_1_76_0'
 
   target 'MinersWorldCoinTests' do
     inherit! :complete
