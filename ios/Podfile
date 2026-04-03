@@ -18,6 +18,8 @@ target 'MinersWorldCoin' do
   pod 'Permission-MediaLibrary', :path => "#{permissions_path}/MediaLibrary.podspec"
   pod 'Permission-PhotoLibrary', :path => "#{permissions_path}/PhotoLibrary.podspec"
 
+  pod 'RCT-Folly', :podspec => '../node_modules/react-native/third-party-podspecs/RCT-Folly.podspec'
+
   target 'MinersWorldCoinTests' do
     inherit! :complete
   end
@@ -36,6 +38,7 @@ post_install do |installer|
 
       # ✅ Stop Xcode 15 killing build on warnings
       config.build_settings['GCC_TREAT_WARNINGS_AS_ERRORS'] = 'NO'
+      config.build_settings['GCC_WARN_INHIBIT_ALL_WARNINGS'] = 'YES'
 
       # ✅ Fix Folly + Boost compatibility
       config.build_settings['OTHER_CPLUSPLUSFLAGS'] ||= [
