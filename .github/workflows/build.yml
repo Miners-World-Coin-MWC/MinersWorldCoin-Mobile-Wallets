@@ -106,12 +106,9 @@ jobs:
         run: |
           ls -lah ios/vendor/boost
 
-      - name: Override Boost podspec (fixed path)
+      - name: Override Boost podspec
         run: |
-          BOOST_PATH="$(pwd)/ios/vendor/boost/boost_patched.tar.bz2"
-          echo "Boost path: $BOOST_PATH"
-
-          cat > node_modules/react-native/third-party-podspecs/boost.podspec << EOF
+          cat > node_modules/react-native/third-party-podspecs/boost.podspec << 'EOF'
           Pod::Spec.new do |s|
             s.name     = 'boost'
             s.version  = '1.76.0'
@@ -129,7 +126,7 @@ jobs:
 
             s.pod_target_xcconfig = {
               'CLANG_CXX_LANGUAGE_STANDARD' => 'c++17',
-              'CLANG_CXX_LIBRARY' => 'libc++',
+              'CLANG_CXX_LIBRARY' => 'libc++'
             }
           end
           EOF
