@@ -61,8 +61,8 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Select Xcode 14.3
-        run: sudo xcode-select -s /Applications/Xcode_14.3.1.app/Contents/Developer
+      - name: Select Xcode 15.4
+        run: sudo xcode-select -s /Applications/Xcode_15.4.app
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -83,11 +83,22 @@ jobs:
       - name: Fix React Native env
         run: echo "RCT_NEW_ARCH_ENABLED=0" >> $GITHUB_ENV
 
-      - name: Download Boost locally
+      - name: Download & Patch Boost
         run: |
           mkdir -p ios/vendor/boost
           cd ios/vendor/boost
-          curl -L https://archives.boost.io/release/1.76.0/source/boost_1_76_0.tar.bz2 -o boost_1_76_0.tar.bz2
+
+          curl -L https://archives.boost.io/release/1.76.0/source/boost_1_76_0.tar.bz2 -o boost.tar.bz2
+          tar -xjf boost.tar.bz2
+
+          BOOST_DIR="boost_1_76_0/boost/type_traits/integral_constant.hpp"
+
+          echo "Patching Boost..."
+
+          # Fix BOOST_CONSTEXPR -> constexpr
+          sed -i '' 's/BOOST_CONSTEXPR/constexpr/g' $BOOST_DIR
+
+          echo "Boost patched successfully"
 
       - name: Verify Boost file exists
         run: |
@@ -108,7 +119,7 @@ jobs:
             s.author   = { 'Boost' => 'boost@lists.boost.org' }
 
             s.source = {
-              :http => "file://$(pwd)/ios/vendor/boost/boost_1_76_0.tar.bz2"
+              :path => "$(pwd)/ios/vendor/boost/boost_1_76_0"
             }
 
             s.header_dir = 'boost'
