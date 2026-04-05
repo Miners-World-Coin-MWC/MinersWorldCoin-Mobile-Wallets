@@ -190,11 +190,6 @@ jobs:
             echo "⚠️ Folly dynamic.h not found — skipping patch"
           fi
 
-      - name: Verify Folly file exists
-        run: |
-          ls -lah Pods/Headers/Public/RCT-Folly/
-          ls -lah Pods/Headers/Public/RCT-Folly/folly/
-
       - name: Build iOS (unsigned)
         run: |
           cd ios
