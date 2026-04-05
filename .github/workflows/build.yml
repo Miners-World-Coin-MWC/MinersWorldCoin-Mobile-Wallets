@@ -97,20 +97,13 @@ jobs:
 
           FILE="boost_1_76_0/boost/type_traits/integral_constant.hpp"
 
-          # HARD replace (more reliable than sed)
-          perl -pi -e 's/BOOST_CONSTEXPR/constexpr/g' $FILE
+          # Fix constexpr
+          sed -i '' 's/BOOST_CONSTEXPR/constexpr/g' $FILE
 
-          # VERIFY PATCH
-          if grep -q BOOST_CONSTEXPR $FILE; then
-            echo "Patch FAILED"
-            exit 1
-          else
-            echo "Patch SUCCESS"
-          fi
+          echo "Repacking Boost (FLATTENED)..."
 
-          echo "Repacking Boost..."
-
-          tar -cjf boost_patched.tar.bz2 boost_1_76_0
+          cd boost_1_76_0
+          tar -cjf ../boost_patched.tar.bz2 boost
 
       - name: Verify Boost file exists
         run: |

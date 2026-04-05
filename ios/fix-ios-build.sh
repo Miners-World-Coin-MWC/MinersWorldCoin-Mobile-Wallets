@@ -5,7 +5,9 @@ set -e
 echo "🔧 Patching Boost + Folly for Xcode 15..."
 
 # ---- Boost: ensure BOOST_CONSTEXPR is defined ----
-BOOST_FILE="Pods/boost/boost/config/compiler/clang.hpp"
+echo "🔍 Locating Boost clang.hpp..."
+
+BOOST_FILE=$(find Pods -path "*/boost/config/compiler/clang.hpp" | head -n 1)
 
 if [ -f "$BOOST_FILE" ]; then
   if ! grep -q "BOOST_CONSTEXPR constexpr" "$BOOST_FILE"; then
@@ -15,7 +17,8 @@ if [ -f "$BOOST_FILE" ]; then
     echo "BOOST_CONSTEXPR already patched"
   fi
 else
-  echo "⚠️ Boost file not found: $BOOST_FILE"
+  echo "❌ Boost clang.hpp not found anywhere in Pods"
+  exit 1
 fi
 
 # ---- Folly: add missing boost/operators.hpp include ----
