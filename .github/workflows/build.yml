@@ -164,32 +164,30 @@ jobs:
           rm -rf Pods Podfile.lock
           pod install --repo-update
 
-      # - name: Patch Folly (Post Install)
-      #   run: |
-      #     set -e
+      - name: Patch Folly (Post Install)
+        run: |
+          set -e
 
-      #     cd ios
+          cd ios
 
-      #     echo "🔧 Patching Folly..."
+          echo "🔧 Patching Folly (FINAL FIX)..."
 
-      #     FILE="Pods/Headers/Public/RCT-Folly/folly/dynamic.h"
+          FOLLY_FILE=$(find Pods -path "*/RCT-Folly/folly/dynamic.h" | head -n 1)
 
-      #     if [ -f "$FILE" ]; then
-      #       echo "🔧 Patching Folly dynamic.h (symlink-safe)..."
+          if [ -f "$FOLLY_FILE" ]; then
+            echo "Found: $FOLLY_FILE"
 
-      #       TMP_FILE=$(mktemp)
+            # ❌ REMOVE the include completely
+            sed -i '' '/#include <boost\/operators.hpp>/d' "$FOLLY_FILE"
 
-      #       # Add missing include
-      #       sed '1s;^;#include <boost/operators.hpp>\n;' "$FILE" > "$TMP_FILE" && mv "$TMP_FILE" "$FILE"
+            # ❌ REMOVE boost inheritance
+            sed -i '' 's/private boost::operators<dynamic>//g' "$FOLLY_FILE"
 
-      #       # Remove boost::operators dependency
-      #       TMP_FILE=$(mktemp)
-      #       sed 's/private boost::operators<dynamic>//g' "$FILE" > "$TMP_FILE" && mv "$TMP_FILE" "$FILE"
-
-      #       echo "✅ Folly patch complete"
-      #     else
-      #       echo "⚠️ Folly dynamic.h not found — skipping patch"
-      #     fi
+            echo "✅ Removed boost dependency from Folly"
+          else
+            echo "❌ Folly dynamic.h not found"
+            exit 1
+          fi
 
       - name: Build iOS (unsigned)
         run: |
