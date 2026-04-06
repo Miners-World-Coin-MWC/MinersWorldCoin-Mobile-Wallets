@@ -140,7 +140,8 @@ jobs:
 
             s.pod_target_xcconfig = {
               'CLANG_CXX_LANGUAGE_STANDARD' => 'c++17',
-              'CLANG_CXX_LIBRARY' => 'libc++'
+              'CLANG_CXX_LIBRARY' => 'libc++',
+              'HEADER_SEARCH_PATHS' => '"$(PODS_ROOT)/boost/boost_1_76_0" "$(PODS_ROOT)/boost/boost_1_76_0/boost"'
             }
           end
           EOF
