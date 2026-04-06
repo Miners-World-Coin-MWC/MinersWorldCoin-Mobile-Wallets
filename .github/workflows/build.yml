@@ -139,11 +139,6 @@ jobs:
           end
           EOF
 
-      - name: Ensure Boost exists in Pods
-        run: |
-          ls -lah ios/Pods/boost/boost_1_76_0/ || (echo "❌ Boost missing!" && exit 1)
-          
-
       - name: Fix Yoga for Xcode 15
         run: |
           FILE="node_modules/react-native/ReactCommon/yoga/yoga/Yoga.cpp"
@@ -161,6 +156,11 @@ jobs:
           cd ios
           rm -rf Pods Podfile.lock
           pod install --repo-update
+
+      - name: Ensure Boost exists in Pods
+        run: |
+          ls -lah ios/Pods/boost/boost_1_76_0/boost || (echo "❌ Boost missing!" && exit 1)
+          ls -lah ios/Pods/boost/boost_1_76_0/ || (echo "❌ Boost missing!" && exit 1)
 
       - name: Patch Folly (Post Install)
         run: |
