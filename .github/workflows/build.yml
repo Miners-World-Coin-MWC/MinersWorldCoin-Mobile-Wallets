@@ -85,7 +85,7 @@ jobs:
           echo "RCT_NEW_ARCH_ENABLED=0" >> $GITHUB_ENV
           echo "RCT_ENABLE_TURBO_MODULES=0" >> $GITHUB_ENV
 
-      - name: Download, Patch & Repack Boost
+      - name: Download & Patch Boost (no repack)
         run: |
           set -e
 
@@ -99,29 +99,22 @@ jobs:
 
           echo "🔧 Patching Boost..."
 
-          # Fix constexpr
           FILE="boost_1_76_0/boost/type_traits/integral_constant.hpp"
           sed -i '' 's/BOOST_CONSTEXPR/constexpr/g' $FILE
 
-          # Ensure BOOST_CONSTEXPR globally
           FILE="boost_1_76_0/boost/config/compiler/clang.hpp"
           sed -i '' '1s;^;#ifndef BOOST_CONSTEXPR\n#define BOOST_CONSTEXPR constexpr\n#endif\n;' $FILE
 
-          echo "📦 Repacking Boost (FULL STRUCTURE)..."
-
-          # 🔥 KEEP FULL STRUCTURE (boost + libs + everything)
-          tar -cjf boost_patched.tar.bz2 boost_1_76_0
+          echo "✅ Boost ready (EXTRACTED, NOT ARCHIVED)"
+          ls -lah boost_1_76_0
 
       - name: Verify Boost file exists
         run: |
           ls -lah ios/vendor/boost
 
-      - name: Override Boost podspec (fixed path)
+      - name: Override Boost podspec (LOCAL PATH FIX)
         run: |
-          BOOST_PATH="$(pwd)/ios/vendor/boost/boost_patched.tar.bz2"
-          echo "Boost path: $BOOST_PATH"
-
-          cat > node_modules/react-native/third-party-podspecs/boost.podspec << EOF
+          cat > node_modules/react-native/third-party-podspecs/boost.podspec << 'EOF'
           Pod::Spec.new do |s|
             s.name     = 'boost'
             s.version  = '1.76.0'
@@ -130,21 +123,26 @@ jobs:
             s.license  = { :type => 'Boost Software License' }
             s.author   = { 'Boost' => 'boost@lists.boost.org' }
 
-            s.source = {
-              :http => "file://$BOOST_PATH"
-            }
+            # 🔥 USE LOCAL FOLDER (NOT TAR)
+            s.source = { :path => '../../../ios/vendor/boost' }
 
             s.header_dir = 'boost'
+            s.source_files = 'boost_1_76_0/boost/**/*.hpp'
             s.preserve_paths = 'boost_1_76_0'
             s.header_mappings_dir = 'boost_1_76_0'
 
             s.pod_target_xcconfig = {
+              'HEADER_SEARCH_PATHS' => '"$(PODS_ROOT)/boost/boost_1_76_0" "$(PODS_ROOT)/boost/boost_1_76_0/boost"',
               'CLANG_CXX_LANGUAGE_STANDARD' => 'c++17',
-              'CLANG_CXX_LIBRARY' => 'libc++',
-              'HEADER_SEARCH_PATHS' => '"\$(PODS_ROOT)/boost/boost_1_76_0" "\$(PODS_ROOT)/boost/boost_1_76_0/boost"'
+              'CLANG_CXX_LIBRARY' => 'libc++'
             }
           end
           EOF
+
+      - name: Ensure Boost exists in Pods
+        run: |
+          ls -lah ios/Pods/boost/boost_1_76_0/boost || (echo "❌ Boost missing!" && exit 1)
+          ls -lah ios/Pods/boost/boost_1_76_0/libs || (echo "❌ Libs missing!" && exit 1)
 
       - name: Fix Yoga for Xcode 15
         run: |
