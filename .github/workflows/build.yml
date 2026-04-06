@@ -124,7 +124,7 @@ jobs:
             s.author   = { 'Boost' => 'boost@lists.boost.org' }
 
             # 🔥 USE LOCAL FOLDER (NOT TAR)
-            s.source = { :path => '../../../ios/vendor/boost' }
+            s.source = { :http => "file://#{File.expand_path('../../ios/vendor/boost/boost_patched.tar.bz2', __dir__)}" }
 
             s.header_dir = 'boost'
             s.source_files = 'boost_1_76_0/boost/**/*.hpp'
@@ -162,30 +162,44 @@ jobs:
           ls -lah ios/Pods/boost/boost_1_76_0/boost || (echo "❌ Boost missing!" && exit 1)
           ls -lah ios/Pods/boost/boost_1_76_0/ || (echo "❌ Boost missing!" && exit 1)
 
-      - name: Patch Folly (Post Install)
+      # - name: Patch Folly (Post Install)
+      #   run: |
+      #     set -e
+
+      #     cd ios
+
+      #     echo "🔧 Patching Folly (FINAL FIX)..."
+
+      #     FOLLY_FILE=$(find Pods -path "*/RCT-Folly/folly/dynamic.h" | head -n 1)
+
+      #     if [ -f "$FOLLY_FILE" ]; then
+      #       echo "Found: $FOLLY_FILE"
+
+      #       # ❌ REMOVE the include completely
+      #       sed -i '' '/#include <boost\/operators.hpp>/d' "$FOLLY_FILE"
+
+      #       # ❌ REMOVE boost inheritance
+      #       sed -i '' 's/private boost::operators<dynamic>//g' "$FOLLY_FILE"
+
+      #       echo "✅ Removed boost dependency from Folly"
+      #     else
+      #       echo "❌ Folly dynamic.h not found"
+      #       exit 1
+      #     fi
+
+      - name: Force Folly to use patched Boost
         run: |
-          set -e
+          FILE="node_modules/react-native/third-party-podspecs/RCT-Folly.podspec"
 
-          cd ios
+          echo "Patching RCT-Folly to remove bad boost path..."
 
-          echo "🔧 Patching Folly (FINAL FIX)..."
+          # Remove ANY path-based boost references
+          sed -i '' "s|:path =>.*boost.*||g" $FILE
 
-          FOLLY_FILE=$(find Pods -path "*/RCT-Folly/folly/dynamic.h" | head -n 1)
+          # Ensure it depends on boost normally
+          sed -i '' "s|s.dependency 'boost'.*|s.dependency 'boost'|g" $FILE
 
-          if [ -f "$FOLLY_FILE" ]; then
-            echo "Found: $FOLLY_FILE"
-
-            # ❌ REMOVE the include completely
-            sed -i '' '/#include <boost\/operators.hpp>/d' "$FOLLY_FILE"
-
-            # ❌ REMOVE boost inheritance
-            sed -i '' 's/private boost::operators<dynamic>//g' "$FOLLY_FILE"
-
-            echo "✅ Removed boost dependency from Folly"
-          else
-            echo "❌ Folly dynamic.h not found"
-            exit 1
-          fi
+          echo "✅ RCT-Folly patched"
 
       - name: Build iOS (unsigned)
         run: |
