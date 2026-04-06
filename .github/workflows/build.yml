@@ -114,6 +114,9 @@ jobs:
 
       - name: Override Boost podspec (LOCAL PATH FIX)
         run: |
+          BOOST_PATH="$(pwd)/ios/vendor/boost/boost_patched.tar.bz2"
+          echo "Boost path: $BOOST_PATH"
+
           cat > node_modules/react-native/third-party-podspecs/boost.podspec << 'EOF'
           Pod::Spec.new do |s|
             s.name     = 'boost'
@@ -123,8 +126,7 @@ jobs:
             s.license  = { :type => 'Boost Software License' }
             s.author   = { 'Boost' => 'boost@lists.boost.org' }
 
-            # 🔥 USE LOCAL FOLDER (NOT TAR)
-            s.source = { :http => "file://#{File.expand_path('../../ios/vendor/boost/boost_patched.tar.bz2', __dir__)}" }
+            s.source = { :http => "file://$BOOST_PATH" }
 
             s.header_dir = 'boost'
             s.source_files = 'boost_1_76_0/boost/**/*.hpp'
