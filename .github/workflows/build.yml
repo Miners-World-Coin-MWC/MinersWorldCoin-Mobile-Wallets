@@ -135,8 +135,8 @@ jobs:
             }
 
             s.header_dir = 'boost'
-            s.source_files = 'boost_1_76_0/boost/**/*.hpp'
             s.preserve_paths = 'boost_1_76_0'
+            s.header_mappings_dir = 'boost_1_76_0'
 
             s.pod_target_xcconfig = {
               'CLANG_CXX_LANGUAGE_STANDARD' => 'c++17',
