@@ -111,11 +111,6 @@ jobs:
 
           echo "✅ Boost injected"
 
-      - name: Verify Boost file exists
-        run: |
-          ls -lah ios/vendor/boost
-          ls -lah ios/vendor/boost/boost_1_76_0
-
       # - name: Override Boost podspec (LOCAL PATH FIX)
       #   run: |
       #     BOOST_PATH="$(pwd)/ios/vendor/boost/boost_patched.tar.bz2"
