@@ -85,22 +85,24 @@ jobs:
           echo "RCT_NEW_ARCH_ENABLED=0" >> $GITHUB_ENV
           echo "RCT_ENABLE_TURBO_MODULES=0" >> $GITHUB_ENV
 
-      - name: Download & Patch Boost + Create Tarball
+      - name: Download & Patch Boost + Prepare Pod
         run: |
           set -e
           mkdir -p ios/vendor
           cd ios/vendor
 
           echo "📦 Downloading Boost..."
-          curl -L https://archives.boost.io/release/1.76.0/source/boost_1_76_0.tar.bz2 -o boost.tar.bz2
+          curl -L https://boostorg.jfrog.io/artifactory/main/release/1.76.0/source/boost_1_76_0.tar.bz2 -o boost.tar.bz2
           tar -xjf boost.tar.bz2
 
-          echo "🔧 Patching Boost..."
-          sed -i '' 's/BOOST_CONSTEXPR/constexpr/g' boost_1_76_0/boost/type_traits/integral_constant.hpp
-          sed -i '' '1s;^;#ifndef BOOST_CONSTEXPR\n#define BOOST_CONSTEXPR constexpr\n#endif\n;' boost_1_76_0/boost/config/compiler/clang.hpp
+          echo "🔧 Patching Boost headers..."
+          # Example patch to fix constexpr issues for Xcode 15
+          find boost_1_76_0/boost -name '*.hpp' -exec sed -i '' 's/BOOST_CONSTEXPR/constexpr/g' {} +
 
-          echo "📦 Creating local Boost tarball for CocoaPods..."
-          tar -cjf boost_local.tar.bz2 -C boost_1_76_0 boost
+          echo "📦 Preparing tarball for CocoaPods..."
+          # Tar the full contents of boost_1_76_0 (not just boost/)
+          tar -cjf boost_full.tar.bz2 -C boost_1_76_0 .
+
           cd ../..
 
       - name: Override Boost podspec to use local tarball
@@ -117,8 +119,8 @@ jobs:
             s.license  = { :type => 'Boost Software License' }
             s.author   = { 'Boost' => 'boost@lists.boost.org' }
 
-            # Use local tarball to avoid checksum errors
-            s.source = { :http => "file://$BOOST_TARBALL" }
+            # Point to tarball root (entire contents)
+            s.source = { :http => "file://#{Dir.pwd}/ios/vendor/boost_full.tar.bz2" }
 
             s.header_dir = 'boost'
             s.source_files = 'boost/**/*.hpp'
@@ -126,7 +128,7 @@ jobs:
             s.preserve_paths = 'boost'
 
             s.pod_target_xcconfig = {
-              'HEADER_SEARCH_PATHS' => '"$(PODS_ROOT)/boost" "$(PODS_ROOT)/boost/boost"',
+              'HEADER_SEARCH_PATHS' => '"$(PODS_ROOT)/boost"',
               'CLANG_CXX_LANGUAGE_STANDARD' => 'c++17',
               'CLANG_CXX_LIBRARY' => 'libc++'
             }
