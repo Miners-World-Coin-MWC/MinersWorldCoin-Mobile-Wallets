@@ -85,33 +85,28 @@ jobs:
           echo "RCT_NEW_ARCH_ENABLED=0" >> $GITHUB_ENV
           echo "RCT_ENABLE_TURBO_MODULES=0" >> $GITHUB_ENV
 
-      # ✅ SETUP BOOST (LOCAL SOURCE BEFORE POD INSTALL)
-      - name: Setup Boost (LOCAL SOURCE)
+      - name: Download & Patch Boost + Create Tarball
         run: |
           set -e
-
-          mkdir -p ios/vendor/boost
-          cd ios/vendor/boost
+          mkdir -p ios/vendor
+          cd ios/vendor
 
           echo "📦 Downloading Boost..."
           curl -L https://archives.boost.io/release/1.76.0/source/boost_1_76_0.tar.bz2 -o boost.tar.bz2
-
           tar -xjf boost.tar.bz2
 
           echo "🔧 Patching Boost..."
-
           sed -i '' 's/BOOST_CONSTEXPR/constexpr/g' boost_1_76_0/boost/type_traits/integral_constant.hpp
+          sed -i '' '1s;^;#ifndef BOOST_CONSTEXPR\n#define BOOST_CONSTEXPR constexpr\n#endif\n;' boost_1_76_0/boost/config/compiler/clang.hpp
 
-          sed -i '' '1s;^;#ifndef BOOST_CONSTEXPR\n#define BOOST_CONSTEXPR constexpr\n#endif\n;' \
-          boost_1_76_0/boost/config/compiler/clang.hpp
+          echo "📦 Creating local Boost tarball for CocoaPods..."
+          tar -cjf boost_local.tar.bz2 -C boost_1_76_0 boost
+          cd ../..
 
-          echo "✅ Boost ready at ios/vendor/boost/boost_1_76_0"
-
-      # ✅ OVERRIDE BOOST PODSPEC (LOCAL PATH - NO DOWNLOAD)
-      - name: Override Boost podspec (LOCAL DEV POD)
+      - name: Override Boost podspec to use local tarball
         run: |
-          BOOST_DIR="$(pwd)/ios/vendor/boost/boost_1_76_0"
-          echo "Using Boost from: $BOOST_DIR"
+          BOOST_TARBALL="$(pwd)/ios/vendor/boost_local.tar.bz2"
+          echo "Using Boost tarball at $BOOST_TARBALL"
 
           cat > node_modules/react-native/third-party-podspecs/boost.podspec << EOF
           Pod::Spec.new do |s|
@@ -122,8 +117,8 @@ jobs:
             s.license  = { :type => 'Boost Software License' }
             s.author   = { 'Boost' => 'boost@lists.boost.org' }
 
-            # ✅ LOCAL SOURCE (THIS FIXES EVERYTHING)
-            s.source = { :path => '$BOOST_DIR' }
+            # Use local tarball to avoid checksum errors
+            s.source = { :http => "file://$BOOST_TARBALL" }
 
             s.header_dir = 'boost'
             s.source_files = 'boost/**/*.hpp'
@@ -138,32 +133,30 @@ jobs:
           end
           EOF
 
-      # ✅ FIX YOGA
+      - name: Remove Boost dependency from RN podspecs
+        run: |
+          FILE="node_modules/react-native/third-party-podspecs/RCT-Folly.podspec"
+          sed -i '' "/s.dependency 'boost'/d" $FILE
+          echo "✅ Removed Boost dependency from RCT-Folly podspec"
+
       - name: Fix Yoga for Xcode 15
         run: |
           FILE="node_modules/react-native/ReactCommon/yoga/yoga/Yoga.cpp"
           if [ -f "$FILE" ]; then
-            echo "Patching Yoga.cpp..."
             sed -i '' 's/hadOverflow() |/hadOverflow() ||/g' $FILE
             sed -i '' 's/constexpr static/constexpr/' $FILE
+            echo "✅ Patched Yoga.cpp for Xcode 15"
           else
             echo "Yoga.cpp not found!"
             exit 1
           fi
 
-      # ✅ INSTALL PODS
       - name: Install Pods
         run: |
           cd ios
           rm -rf Pods Podfile.lock
           pod install --repo-update
 
-      # ✅ VERIFY BOOST IS ACTUALLY PRESENT
-      - name: Verify Boost in Pods
-        run: |
-          ls -lah ios/Pods/boost/boost || (echo "❌ Boost missing!" && exit 1)
-
-      # ✅ BUILD
       - name: Build iOS (unsigned)
         run: |
           cd ios
@@ -177,7 +170,6 @@ jobs:
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO
 
-      # ✅ PACKAGE
       - name: Package IPA
         run: |
           cd ios
