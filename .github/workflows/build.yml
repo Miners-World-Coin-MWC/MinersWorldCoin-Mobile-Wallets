@@ -88,20 +88,34 @@ jobs:
       - name: Download & Patch Boost + Prepare Pod
         run: |
           set -e
+
           mkdir -p ios/vendor
           cd ios/vendor
 
-          echo "📦 Downloading Boost..."
-          curl -L https://boostorg.jfrog.io/artifactory/main/release/1.76.0/source/boost_1_76_0.tar.bz2 -o boost.tar.bz2
+          echo "📦 Downloading Boost (stable mirror)..."
+          curl -L --fail https://archives.boost.io/release/1.76.0/source/boost_1_76_0.tar.bz2 -o boost.tar.bz2
+
+          echo "📏 Checking file size..."
+          ls -lh boost.tar.bz2
+
+          # sanity check (~100MB expected)
+          FILESIZE=$(stat -f%z boost.tar.bz2)
+          if [ "$FILESIZE" -lt 50000000 ]; then
+            echo "❌ Boost download is too small — failed!"
+            exit 1
+          fi
+
+          echo "📦 Extracting..."
           tar -xjf boost.tar.bz2
 
           echo "🔧 Patching Boost headers..."
-          # Example patch to fix constexpr issues for Xcode 15
           find boost_1_76_0/boost -name '*.hpp' -exec sed -i '' 's/BOOST_CONSTEXPR/constexpr/g' {} +
 
-          echo "📦 Preparing tarball for CocoaPods..."
-          # Tar the full contents of boost_1_76_0 (not just boost/)
+          echo "📦 Repacking FULL Boost (critical)..."
           tar -cjf boost_full.tar.bz2 -C boost_1_76_0 .
+
+          echo "✅ Boost ready:"
+          ls -lah
 
           cd ../..
 
