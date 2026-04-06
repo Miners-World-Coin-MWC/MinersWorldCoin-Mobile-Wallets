@@ -140,6 +140,17 @@ jobs:
       #     end
       #     EOF
 
+      - name: Remove Boost from React Native podspecs
+        run: |
+          echo "🔥 Removing Boost dependency from RN..."
+
+          FILE="node_modules/react-native/third-party-podspecs/RCT-Folly.podspec"
+
+          # Remove boost dependency entirely
+          sed -i '' "/s.dependency 'boost'/d" $FILE
+
+          echo "✅ Boost dependency removed"
+
       - name: Fix Yoga for Xcode 15
         run: |
           FILE="node_modules/react-native/ReactCommon/yoga/yoga/Yoga.cpp"
