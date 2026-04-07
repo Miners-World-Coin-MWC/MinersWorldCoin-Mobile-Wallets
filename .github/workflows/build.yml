@@ -119,9 +119,11 @@ jobs:
 
           cd ../..
 
-      - name: Override Boost podspec to use local tarball
+      - name: Override Boost podspec (FINAL FIX)
         run: |
-          BOOST_TARBALL="$(pwd)/ios/vendor/boost_local.tar.bz2"
+          set -e
+
+          BOOST_TARBALL="$GITHUB_WORKSPACE/ios/vendor/boost_full.tar.bz2"
           echo "Using Boost tarball at $BOOST_TARBALL"
 
           cat > node_modules/react-native/third-party-podspecs/boost.podspec << EOF
@@ -133,8 +135,8 @@ jobs:
             s.license  = { :type => 'Boost Software License' }
             s.author   = { 'Boost' => 'boost@lists.boost.org' }
 
-            # Point to tarball root (entire contents)
-            s.source = { :http => "file://#{Dir.pwd}/ios/vendor/boost_full.tar.bz2" }
+            # ✅ Absolute path (FIXED)
+            s.source = { :http => "file://$BOOST_TARBALL" }
 
             s.header_dir = 'boost'
             s.source_files = 'boost/**/*.hpp'
@@ -142,7 +144,8 @@ jobs:
             s.preserve_paths = 'boost'
 
             s.pod_target_xcconfig = {
-              'HEADER_SEARCH_PATHS' => '"$(PODS_ROOT)/boost"',
+              # ✅ Escape $ so bash doesn't eat it
+              'HEADER_SEARCH_PATHS' => '"\$(PODS_ROOT)/boost"',
               'CLANG_CXX_LANGUAGE_STANDARD' => 'c++17',
               'CLANG_CXX_LIBRARY' => 'libc++'
             }
