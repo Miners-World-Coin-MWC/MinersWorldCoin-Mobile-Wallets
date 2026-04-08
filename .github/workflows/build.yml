@@ -135,28 +135,25 @@ jobs:
             s.license  = { :type => 'Boost Software License' }
             s.author   = { 'Boost' => 'boost@lists.boost.org' }
 
-            # ✅ Absolute path (FIXED)
-            s.source = { :http => "file://$BOOST_TARBALL" }
+            s.source = { :http => "file://#{File.expand_path('../../../ios/vendor/boost_full.tar.bz2', __dir__)}" }
 
             s.header_dir = 'boost'
             s.source_files = 'boost/**/*.hpp'
             s.public_header_files = 'boost/**/*.hpp'
-            s.preserve_paths = 'boost'
 
             s.pod_target_xcconfig = {
-              # ✅ Escape $ so bash doesn't eat it
-              'HEADER_SEARCH_PATHS' => '"\$(PODS_ROOT)/boost"',
+              'HEADER_SEARCH_PATHS' => '$(PODS_ROOT)/boost',
               'CLANG_CXX_LANGUAGE_STANDARD' => 'c++17',
               'CLANG_CXX_LIBRARY' => 'libc++'
             }
           end
           EOF
 
-      - name: Remove Boost dependency from RN podspecs
-        run: |
-          FILE="node_modules/react-native/third-party-podspecs/RCT-Folly.podspec"
-          sed -i '' "/s.dependency 'boost'/d" $FILE
-          echo "✅ Removed Boost dependency from RCT-Folly podspec"
+      # - name: Remove Boost dependency from RN podspecs
+      #   run: |
+      #     FILE="node_modules/react-native/third-party-podspecs/RCT-Folly.podspec"
+      #     sed -i '' "/s.dependency 'boost'/d" $FILE
+      #     echo "✅ Removed Boost dependency from RCT-Folly podspec"
 
       - name: Fix Yoga for Xcode 15
         run: |
