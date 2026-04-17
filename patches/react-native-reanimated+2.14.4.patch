@@ -1,0 +1,37 @@
+diff --git a/node_modules/react-native-reanimated/android/build.gradle b/node_modules/react-native-reanimated/android/build.gradle
+index da46b94..7717a2a 100644
+--- a/node_modules/react-native-reanimated/android/build.gradle
++++ b/node_modules/react-native-reanimated/android/build.gradle
+@@ -207,6 +207,7 @@ file("$reactNativeRootDir/ReactAndroid/gradle.properties").withInputStream { rea
+ 
+ def REACT_NATIVE_VERSION = reactProperties.getProperty("VERSION_NAME")
+ def REACT_NATIVE_MINOR_VERSION = REACT_NATIVE_VERSION.startsWith("0.0.0-") ? 1000 : REACT_NATIVE_VERSION.split("\\.")[1].toInteger()
++def minor = REACT_NATIVE_MINOR_VERSION
+ def REANIMATED_PACKAGE_BUILD = System.getenv("REANIMATED_PACKAGE_BUILD")
+ def REANIMATED_VERSION = getReanimatedVersion()
+ def REANIMATED_MAJOR_VERSION = getReanimatedMajorVersion()
+@@ -243,7 +244,10 @@ def JS_RUNTIME = {
+ 
+     // Check if Hermes is enabled in app setup
+     def appProject = rootProject.allprojects.find { it.plugins.hasPlugin('com.android.application') }
+-    if ((REACT_NATIVE_MINOR_VERSION >= 71 && appProject?.hermesEnabled?.toBoolean()) || appProject?.ext?.react?.enableHermes?.toBoolean()) {
++
++    def hermesEnabled = appProject?.ext?.react?.enableHermes ?: false
++
++    if (hermesEnabled.toBoolean()) {
+         return "hermes"
+     }
+ 
+@@ -289,10 +293,10 @@ def detectAAR(Integer rnMinorVersion, String engine) { // Reanimated2 only
+             println "\n\n\n"
+             println "****************************************************************************************"
+             println "\n\n\n"
+-            println "WARNING reanimated - no version-specific reanimated AAR for react-native version $minor found."
++            println "WARNING reanimated - no version-specific reanimated AAR for react-native version $rnMinorVersion found."
+             println "Falling back to AAR for react-native version $rnMinorVersionCopy."
+             println "The react-native JSI interface is not ABI-safe yet, this may result in crashes."
+-            println "Please post a pull request to implement support for react-native version $minor to the reanimated repo."
++            println "Please post a pull request to implement support for react-native version $rnMinorVersion to the reanimated repo."
+             println "Thanks!"
+             println "\n\n\n"
+             println "****************************************************************************************"

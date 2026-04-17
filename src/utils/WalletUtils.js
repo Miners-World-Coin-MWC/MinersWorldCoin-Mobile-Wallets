@@ -8,6 +8,12 @@ import Config from 'react-native-config';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from "axios";
 import qs from 'qs';
+
+export const ADDRESS_TYPES = {
+    LEGACY: 'legacy',
+    SEGWIT: 'segwit',
+    BECH32: 'bech32'
+};
 const API = "https://api.minersworld.org";
 
 const hashType = bitcoin.Transaction.SIGHASH_ALL;
@@ -131,25 +137,53 @@ function getP2SHScript(redeem) {
 }
 
 function getScriptType(script) {
-  var type = undefined
+    if (!script) return undefined;
 
-  if (script.includes(bitcoin.opcodes.OP_0) && script[1] == 20) {
-	type = 'bech32'
-  }
+    if (script[0] === bitcoin.opcodes.OP_0 && script[1] === 20) {
+        return 'bech32';
+    }
 
-  if (script.includes(bitcoin.opcodes.OP_HASH160) && script[1] == 20) {
-	type = 'segwit'
-  }
+    if (script[0] === bitcoin.opcodes.OP_HASH160 && script[1] === 20) {
+        return 'segwit';
+    }
 
-  if (script.includes(bitcoin.opcodes.OP_DUP) && script.includes(bitcoin.opcodes.OP_HASH160) && script[2] == 20) {
-	type = 'legacy'
-  }
+    if (
+        script[0] === bitcoin.opcodes.OP_DUP &&
+        script[1] === bitcoin.opcodes.OP_HASH160 &&
+        script[2] === 20
+    ) {
+        return 'legacy';
+    }
 
-  return type
+    return undefined;
 }
 
-function getAddress(node, network) {
-	return bitcoin.payments.p2wpkh({ pubkey: node.publicKey, network }).address;
+function getAddress(node, network, type = ADDRESS_TYPES.BECH32) {
+    switch (type) {
+        case ADDRESS_TYPES.LEGACY:
+            return bitcoin.payments.p2pkh({
+                pubkey: node.publicKey,
+                network
+            }).address;
+
+        case ADDRESS_TYPES.SEGWIT:
+            const redeem = bitcoin.payments.p2wpkh({
+                pubkey: node.publicKey,
+                network
+            });
+
+            return bitcoin.payments.p2sh({
+                redeem,
+                network
+            }).address;
+
+        case ADDRESS_TYPES.BECH32:
+        default:
+            return bitcoin.payments.p2wpkh({
+                pubkey: node.publicKey,
+                network
+            }).address;
+    }
 }
 
 function removeDuplicates(myArr, prop) {
@@ -184,13 +218,54 @@ export function isAddress(address) {
 	}
 }
 
-export function importAddressByWIF(wif) {
-	try {
-		const keyPair = bitcoin.ECPair.fromWIF(wif, mwc);
-		return getAddress(keyPair, mwc);
-	} catch (e) {
-		return null;
-	}
+export function isValidWIF(wif) {
+    try {
+        ECPair.fromWIF(wif, mwc);
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
+
+export function importAddressByWIF(wif, type = ADDRESS_TYPES.LEGACY) {
+    try {
+        const keyPair = bitcoin.ECPair.fromWIF(wif, mwc);
+
+        switch (type) {
+            case ADDRESS_TYPES.BECH32:
+                return bitcoin.payments.p2wpkh({
+                    pubkey: keyPair.publicKey,
+                    network: mwc
+                }).address;
+
+            case ADDRESS_TYPES.SEGWIT:
+                const redeem = bitcoin.payments.p2wpkh({
+                    pubkey: keyPair.publicKey,
+                    network: mwc
+                });
+
+                return bitcoin.payments.p2sh({
+                    redeem,
+                    network: mwc
+                }).address;
+
+            case ADDRESS_TYPES.LEGACY:
+            default:
+                return bitcoin.payments.p2pkh({
+                    pubkey: keyPair.publicKey,
+                    network: mwc
+                }).address;
+        }
+    } catch (e) {
+        console.log("WIF import error:", e);
+        return null;
+    }
+}
+
+export function deriveAddressFromWIF(wif, type = ADDRESS_TYPES.LEGACY) {
+    if (!isValidWIF(wif)) return null;
+
+    return importAddressByWIF(wif, type);
 }
 
 export function getLanguageInfo(code) {
@@ -223,18 +298,34 @@ export function generateSeedPhrase(size = 12) {
 	return seedPhrase;
 }
 
-export function generateAddresses(seedPhrase, derivePath = "m/44'/0'/0'/0", startIndex = 0, endIndex = 0) {
+export function generateAddresses(
+    seedPhrase,
+    derivePath = "m/44'/0'/0'/0",
+    startIndex = 0,
+    endIndex = 0,
+    type = ADDRESS_TYPES.BECH32
+) {
     const seed = bip39.mnemonicToSeed(seedPhrase);
-	const root = bip32.fromSeed(seed, mwc);
-    let addressList = {};
-    let promises = [];
+    const root = bip32.fromSeed(seed, mwc);
 
-    for (var i = startIndex; i <= endIndex; i++) {
-		const child = root.derivePath(derivePath + "/" + i.toString());
-	    addressList[getAddress(child, mwc)] = {index: i, privateKey: child.toWIF()};
+    let addressList = {};
+
+    for (let i = startIndex; i <= endIndex; i++) {
+        const child = root.derivePath(derivePath + "/" + i.toString());
+
+        const address = getAddress(child, mwc, type);
+
+        addressList[address] = {
+            index: i,
+            privateKey: child.toWIF(),
+            type // 👈 IMPORTANT ADDITION
+        };
     }
 
-    return addressList;
+    return {
+        addresses: addressList,
+        first: Object.keys(addressList)[0] // 👈 IMPORTANT FIX
+    };
 }
 
 export async function checkAddresses(socketConnect, addresses) {

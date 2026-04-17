@@ -68,39 +68,125 @@ class ReceiveScreen extends PureComponent {
         Navigation.events().bindComponent(this);
     }
 
-    componentDidMount() {
-        this.ensureAddress();
-    }
+    componentDidUpdate(prevProps) {
+        const prevWallet = prevProps.wallet?.[this.props.timestamp];
+        const currentWallet = this.props.wallet?.[this.props.timestamp];
 
-    ensureAddress = async () => {
-        // auto-generate an address if none exists
-        const { timestamp, setWalletValues, updateWalletValues, wallet } = this.props;
-        const walletData = wallet[timestamp];
+        if (!currentWallet) return;
 
-        if (!walletData.receiveAddress || !walletData.addresses || Object.keys(walletData.addresses).length === 0) {
-            const seed = walletData.seedPhrase.join(" ");
-            const newAddressObj = await generateAddresses(seed, Config.DERIVATION_PATH + "0", 0, 0);
-            const firstAddress = Object.keys(newAddressObj)[0];
+        const prevType = prevProps.defaultAddressType;
+        const currentType = this.props.defaultAddressType;
 
-            // update wallet state immediately
-            setWalletValues({ receiveAddress: firstAddress, timestamp });
-            updateWalletValues({ addresses: newAddressObj, timestamp });
+        const prevReceive = prevWallet?.receiveAddress;
+        const currentReceive = currentWallet?.receiveAddress;
+
+        if (
+            prevType !== currentType ||
+            prevReceive !== currentReceive
+        ) {
+            this.ensureAddress(currentType);
         }
     }
 
+    ensureAddress = async (forcedType) => {
+        const { timestamp, setWalletValues, updateWalletValues, wallet } = this.props;
+        const walletData = wallet[timestamp];
+
+        if (!walletData) return;
+
+        const addressType =
+            forcedType ||
+            this.props.defaultAddressType ||
+            'bech32';
+
+        const addressesByType = walletData.addressesByType || {};
+
+        // ✅ already exists → just switch
+        if (addressesByType[addressType]) {
+            setWalletValues({
+                receiveAddress: addressesByType[addressType],
+                timestamp
+            });
+            return;
+        }
+
+        const seed = walletData.seedPhrase.join(" ");
+        const derivePath = Config.DERIVATION_PATH + "0";
+
+        const { addresses, first } = generateAddresses(
+            seed,
+            derivePath,
+            0,
+            0,
+            addressType
+        );
+
+        updateWalletValues({
+            addresses: {
+                ...walletData.addresses,
+                ...addresses
+            },
+            addressesByType: {
+                ...addressesByType,
+                [addressType]: first
+            },
+            timestamp
+        });
+
+        setWalletValues({
+            receiveAddress: first,
+            timestamp
+        });
+    };
+
     newAddress = async () => {
-        const { setWalletValues, updateWalletValues, timestamp, wallet } = this.props;
-        const { addresses, receiveAddress, seedPhrase } = wallet[timestamp];
+        const { setWalletValues, updateWalletValues, timestamp, wallet, defaultAddressType } = this.props;
+        const walletData = wallet[timestamp];
 
-        const currentIndex = addresses && addresses[receiveAddress] ? addresses[receiveAddress].index : 0;
-        const newAddressObj = await generateAddresses(seedPhrase.join(" "), Config.DERIVATION_PATH + "0", currentIndex + 1, currentIndex + 1);
-        const firstAddress = Object.keys(newAddressObj)[0];
+        if (!walletData) return;
 
-        setWalletValues({ receiveAddress: firstAddress, timestamp });
+        const addressType = defaultAddressType || 'bech32';
 
-        // merge new address into addresses
-        updateWalletValues({ addresses: { ...addresses, ...newAddressObj }, timestamp });
-    }
+        const addresses = walletData.addresses || {};
+        const addressesByType = walletData.addressesByType || {};
+
+        // find last index safely per type
+        let lastIndex = 0;
+
+        for (let addr in addresses) {
+            if (addresses[addr]?.type === addressType) {
+                lastIndex = Math.max(lastIndex, addresses[addr].index || 0);
+            }
+        }
+
+        const seed = walletData.seedPhrase.join(" ");
+        const derivePath = Config.DERIVATION_PATH + "0";
+
+        const { addresses: newAddresses, first } = generateAddresses(
+            seed,
+            derivePath,
+            lastIndex + 1,
+            lastIndex + 1,
+            addressType
+        );
+
+        setWalletValues({
+            receiveAddress: first,
+            timestamp
+        });
+
+        updateWalletValues({
+            addresses: {
+                ...addresses,
+                ...newAddresses
+            },
+            addressesByType: {
+                ...addressesByType,
+                [addressType]: first
+            },
+            timestamp
+        });
+    };
 
     copyAddress = async () => {
         const { timestamp, wallet } = this.props;

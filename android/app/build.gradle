@@ -1,27 +1,28 @@
 apply plugin: "com.android.application"
 apply plugin: "kotlin-android"
+apply plugin: "com.facebook.react"
+
 apply from: project(':react-native-config').projectDir.getPath() + "/dotenv.gradle"
 
 project.ext.react = [
-    enableHermes: false,
+    enableHermes: true, 
 ]
 
-apply from: "../../node_modules/react-native/react.gradle"
+def enableHermes = project.ext.react.get("enableHermes", false)
 
 def enableSeparateBuildPerCPUArchitecture = false
 def enableProguardInReleaseBuilds = false
-def jscFlavor = 'org.webkit:android-jsc:+'
-def enableHermes = project.ext.react.get("enableHermes", false)
 
 android {
+    namespace "com.minersworldcoin.wallet"
     compileSdkVersion rootProject.ext.compileSdkVersion
 
     defaultConfig {
         applicationId "com.minersworldcoin.wallet"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        versionCode 101
+        versionName "1.0.1"
         multiDexEnabled true
     }
 
@@ -70,32 +71,31 @@ android {
     }
 
     packagingOptions {
-        pickFirst "lib/armeabi-v7a/libc++_shared.so"
-        pickFirst "lib/arm64-v8a/libc++_shared.so"
-        pickFirst "lib/x86/libc++_shared.so"
-        pickFirst "lib/x86_64/libc++_shared.so"
+        jniLibs {
+            useLegacyPackaging true
+            pickFirst "lib/armeabi-v7a/libc++_shared.so"
+            pickFirst "lib/arm64-v8a/libc++_shared.so"
+            pickFirst "lib/x86/libc++_shared.so"
+            pickFirst "lib/x86_64/libc++_shared.so"
+        }
+        resources {
+            excludes += ["META-INF/*"]
+        }
     }
 }
 
 dependencies {
     implementation fileTree(dir: "libs", include: ["*.jar"])
-    implementation "com.facebook.react:react-native:0.68.5"
+
+    implementation("com.facebook.react:react-android")
     implementation "androidx.swiperefreshlayout:swiperefreshlayout:1.0.0"
     implementation "androidx.multidex:multidex:2.0.1"
 
     if (enableHermes) {
-        def hermesPath = "../../node_modules/hermes-engine/android/"
-        debugImplementation files(hermesPath + "hermes-debug.aar")
-        releaseImplementation files(hermesPath + "hermes-release.aar")
+        implementation("com.facebook.react:hermes-android")
     } else {
         implementation jscFlavor
     }
-}
-
-// Copy dependencies for BUCK (optional)
-task copyDownloadableDepsToLibs(type: Copy) {
-    from configurations.implementation
-    into 'libs'
 }
 
 apply from: file("../../node_modules/@react-native-community/cli-platform-android/native_modules.gradle")

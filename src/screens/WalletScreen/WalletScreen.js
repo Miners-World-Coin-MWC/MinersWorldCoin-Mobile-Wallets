@@ -90,28 +90,47 @@ class WalletScreen extends PureComponent {
     };
 
     componentDidMount() {
-        AppState.addEventListener('change', this.handleAppStateChange);
+        // ✅ AppState (new API)
+        this.appStateSubscription = AppState.addEventListener(
+            'change',
+            this.handleAppStateChange
+        );
+
         this.firstOpen();
 
-        // Socket polling
+        // 🔌 Socket polling
         this.connectInterval = setInterval(() => {
             const currentStatus = global.socketConnect?.status?.() ?? false;
+
             if (currentStatus !== this.state.isSocketConnected) {
                 this.setState({ isSocketConnected: currentStatus });
-                if (currentStatus) this.refreshHistory();
+
+                if (currentStatus) {
+                    this.refreshHistory();
+                }
             }
         }, 3000);
 
-        // ✅ Poll the API for network status
+        // 🌐 Network polling
         this.networkInterval = setInterval(() => {
             this.checkNetworkStatus();
         }, 3000);
     }
 
     componentWillUnmount() {
-        clearInterval(this.connectInterval);
-        clearInterval(this.networkInterval);
-        AppState.removeEventListener('change', this.handleAppStateChange);
+        // 🧹 Clear intervals
+        if (this.connectInterval) {
+            clearInterval(this.connectInterval);
+        }
+
+        if (this.networkInterval) {
+            clearInterval(this.networkInterval);
+        }
+
+        // 🧹 Remove AppState listener (new API)
+        if (this.appStateSubscription) {
+            this.appStateSubscription.remove();
+        }
     }
 
     handleAppStateChange = (nextAppState) => {

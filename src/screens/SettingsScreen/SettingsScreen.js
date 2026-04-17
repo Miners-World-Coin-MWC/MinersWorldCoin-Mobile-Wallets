@@ -20,7 +20,7 @@ import {
 import { Navigation } from 'react-native-navigation';
 import * as Keychain from 'react-native-keychain';
 import { connectWallet } from 'src/redux';
-import { getTransactionHistory, getBalance } from 'src/utils/WalletUtils';
+import { getTransactionHistory, getAddressBalance } from 'src/utils/WalletUtils';
 import { pushWalletList, pushPasswordGate, pushStarterStack, LANGUAGE_LIST_SCREEN, IMPORT_KEY_SCREEN } from 'src/navigation';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ADDRESS_TYPES } from '../../utils/WalletUtils';
@@ -107,15 +107,27 @@ class SettingsScreen extends PureComponent {
     }
 
     setAddressType = async (type) => {
-        await AsyncStorage.setItem("addressType", type);
+        const { setDefaultValues } = this.props;
 
-        Alert.alert(
-            "Address Type Updated",
-            "New addresses will now use: " + type.toUpperCase(),
-            [{ text: "OK" }],
-            { cancelable: false }
-        );
-    }
+        try {
+            await AsyncStorage.setItem("addressType", type);
+
+            // 🔥 THIS is what makes the app react instantly
+            setDefaultValues({
+                defaultAddressType: type
+            });
+
+            Alert.alert(
+                "Address Type Updated",
+                "New addresses will now use: " + type.toUpperCase(),
+                [{ text: "OK" }],
+                { cancelable: false }
+            );
+
+        } catch (e) {
+            console.log("setAddressType error:", e);
+        }
+    };
 
     getCurrentAddressType = async () => {
         const type = await AsyncStorage.getItem("addressType");
@@ -135,7 +147,7 @@ class SettingsScreen extends PureComponent {
         getTransactionHistory(global.socketConnect, addresses).then((newTransactions) => {
             setWalletValues({transactions: newTransactions, timestamp: timestamp});
 
-            getBalance(newTransactions).then((balance) => {
+            getAddressBalance(newTransactions).then((balance) => {
                 setWalletValues({balance, timestamp});
             })
         });
@@ -304,13 +316,13 @@ class SettingsScreen extends PureComponent {
         ]
 
         const secondSection = [
-            // {
-            //     title: global.strings['settings.importWIF'],
-            //     icon: 'key',
-            //     subtitle: null,
+            {
+                title: global.strings['settings.importWIF'],
+                icon: 'key',
+                subtitle: null,
 
-            //     onPress: () => this.openWIFImport()
-            // },
+                onPress: () => this.openWIFImport()
+            },
             {
                 title: global.strings['settings.changePassword'],
                 icon: 'unlock',
@@ -464,7 +476,7 @@ class SettingsScreen extends PureComponent {
 
                     <View style={{ flexDirection: 'row', justifyContent: "center", alignItems: "center", marginTop: 14, backgroundColor: '#202225' }}>
                         <Text style={{ fontSize: 14, padding: 10, color: 'white' }}>
-                            Version: 1.0.1, Build: 8
+                            Version: 1.0.1, Build: 9
                         </Text>
                     </View>
 

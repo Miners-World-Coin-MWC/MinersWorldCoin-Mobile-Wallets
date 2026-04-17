@@ -19,7 +19,7 @@ import {
 import { Navigation } from 'react-native-navigation';
 import { responsiveHeight, responsiveWidth, responsiveFontSize } from 'react-native-responsive-dimensions';
 import { connectWallet } from 'src/redux';
-import { isAddress, importAddressByWIF, getTransactionHistory, getBalance } from 'src/utils/WalletUtils';
+import { isAddress, importAddressByWIF, getTransactionHistory, getAddressBalance } from 'src/utils/WalletUtils';
 
 const styles = StyleSheet.create({
     flex: {
@@ -161,7 +161,7 @@ class ImportKeyScreen extends PureComponent {
                 timestamp
             });
 
-            const balance = await getBalance({
+            const balance = await getAddressBalance({
                 ...safeTransactions,
                 ...(newTransactions || {})
             });
