@@ -91,106 +91,126 @@ class ImportKeyScreen extends PureComponent {
 
     add = async () => {
         const { wif } = this.state;
-        const { updateWalletValues, setWalletValues } = this.props;
-        const { addresses, timestamp, transactions } = this.props.wallet;
+        const { updateWalletValues, setWalletValues, wallet } = this.props;
 
-        const safeAddresses = (addresses && typeof addresses === 'object') ? addresses : {};
-        const safeTransactions = (transactions && typeof transactions === 'object') ? transactions : {};
+        const { timestamp } = this.props;
+        const walletData = wallet[timestamp];
 
-        let importedAddress = importAddressByWIF(wif);
+        if (!walletData) return;
 
-        // ✅ HARD STOP if invalid WIF
-        if (!importedAddress) {
-            Alert.alert(
-                global.strings['importKey.title'],
-                "Invalid private key (WIF)",
-                [{ text: "OK" }]
-            );
+        const safeAddresses = (walletData.addresses && typeof walletData.addresses === 'object')
+            ? walletData.addresses
+            : {};
+
+        const safeTransactions = (walletData.transactions && typeof walletData.transactions === 'object')
+            ? walletData.transactions
+            : {};
+
+        // 🔥 STEP 1 — derive ALL address types
+        const legacy = importAddressByWIF(wif, 'legacy');
+        const segwit = importAddressByWIF(wif, 'segwit');
+        const bech32 = importAddressByWIF(wif, 'bech32');
+
+        if (!legacy && !segwit && !bech32) {
+            Alert.alert("Error", "Invalid private key (WIF)");
             return;
         }
 
-        // ✅ DUPLICATE CHECK
-        if (importedAddress in safeAddresses) {
-            Alert.alert(
-                global.strings['importKey.title'],
-                "Address already exists in wallet",
-                [{ text: "OK" }]
-            );
-            return;
-        }
+        // 🔥 STEP 2 — confirm with user
+        Alert.alert(
+            "Import Private Key",
+            "This will add addresses for ALL types (Legacy, SegWit, Bech32) using this key. Continue?",
+            [
+                { text: "Cancel", style: "cancel" },
+                {
+                    text: "Import",
+                    onPress: async () => {
 
-        // ✅ VALID ADDRESS CHECK
-        if (!isAddress(importedAddress)) {
-            Alert.alert(
-                global.strings['importKey.title'],
-                "Invalid address derived from key",
-                [{ text: "OK" }]
-            );
-            return;
-        }
+                        const newAddresses = {};
 
-        const address = {
-            [importedAddress]: {
-                index: 0,
-                privateKey: wif
-            }
-        };
+                        if (legacy) {
+                            newAddresses[legacy] = { index: 0, privateKey: wif, type: 'legacy' };
+                        }
+                        if (segwit) {
+                            newAddresses[segwit] = { index: 0, privateKey: wif, type: 'segwit' };
+                        }
+                        if (bech32) {
+                            newAddresses[bech32] = { index: 0, privateKey: wif, type: 'bech32' };
+                        }
 
-        const mergedAddresses = { ...safeAddresses, ...address };
+                        const mergedAddresses = {
+                            ...safeAddresses,
+                            ...newAddresses
+                        };
 
-        try {
-            // ✅ ALWAYS MERGE — never overwrite
-            updateWalletValues({
-                addresses: mergedAddresses,
-                timestamp
-            });
+                        const newAddressesByType = {
+                            ...(walletData.addressesByType || {}),
+                            ...(legacy && { legacy }),
+                            ...(segwit && { segwit }),
+                            ...(bech32 && { bech32 })
+                        };
 
-            setWalletValues({
-                receiveAddress: importedAddress,
-                timestamp
-            });
+                        try {
+                            // ✅ update wallet FIRST
+                            updateWalletValues({
+                                addresses: mergedAddresses,
+                                addressesByType: newAddressesByType,
+                                isImported: true,
+                                timestamp
+                            });
 
-            const newTransactions = await getTransactionHistory(
-                global.socketConnect,
-                mergedAddresses,
-                safeTransactions
-            );
+                            // ✅ set correct receive address
+                            const currentType =
+                                walletData.addressType ||
+                                this.props.defaultAddressType ||
+                                'bech32';
 
-            updateWalletValues({
-                transactions: newTransactions || {},
-                timestamp
-            });
+                            const newReceive =
+                                newAddressesByType[currentType] ||
+                                bech32 ||
+                                segwit ||
+                                legacy;
 
-            const balance = await getAddressBalance({
-                ...safeTransactions,
-                ...(newTransactions || {})
-            });
+                            setWalletValues({
+                                receiveAddress: newReceive,
+                                timestamp
+                            });
 
-            setWalletValues({
-                balance: balance || 0,
-                timestamp
-            });
+                            // 🔥 refresh tx + balance
+                            const newTransactions = await getTransactionHistory(
+                                global.socketConnect,
+                                mergedAddresses,
+                                safeTransactions
+                            );
 
-            Alert.alert(
-                global.strings['importKey.title'],
-                global.strings['importKey.successAlert'],
-                [{
-                    text: global.strings['importKey.confirmAlertButton'],
-                    onPress: () => this.cancel(),
-                }],
-                { cancelable: false }
-            );
+                            updateWalletValues({
+                                transactions: newTransactions || {},
+                                timestamp
+                            });
 
-        } catch (err) {
-            console.log("IMPORT FLOW ERROR:", err);
+                            const balance = await getAddressBalance({
+                                ...safeTransactions,
+                                ...(newTransactions || {})
+                            });
 
-            Alert.alert(
-                "Error",
-                "Failed to import key. Check logs.",
-                [{ text: "OK" }]
-            );
-        }
-    }
+                            setWalletValues({
+                                balance: balance || 0,
+                                timestamp
+                            });
+
+                            Alert.alert("Success", "Private key imported successfully");
+
+                            this.cancel();
+
+                        } catch (err) {
+                            console.log("IMPORT FLOW ERROR:", err);
+                            Alert.alert("Error", "Import failed");
+                        }
+                    }
+                }
+            ]
+        );
+    };
 
     cancel = async () => {
         Navigation.dismissModal(this.props.componentId);

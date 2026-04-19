@@ -107,26 +107,25 @@ class SettingsScreen extends PureComponent {
     }
 
     setAddressType = async (type) => {
-        const { setDefaultValues } = this.props;
+        const { wallet, setWalletValues } = this.props;
 
-        try {
-            await AsyncStorage.setItem("addressType", type);
+        // persist globally (optional)
+        await AsyncStorage.setItem("addressType", type);
 
-            // 🔥 THIS is what makes the app react instantly
-            setDefaultValues({
-                defaultAddressType: type
+        // 🔥 update ALL wallets in redux
+        Object.keys(wallet).forEach((timestamp) => {
+            setWalletValues({
+                addressType: type,
+                timestamp
             });
+        });
 
-            Alert.alert(
-                "Address Type Updated",
-                "New addresses will now use: " + type.toUpperCase(),
-                [{ text: "OK" }],
-                { cancelable: false }
-            );
-
-        } catch (e) {
-            console.log("setAddressType error:", e);
-        }
+        Alert.alert(
+            "Address Type Updated",
+            "New addresses will now use: " + type.toUpperCase(),
+            [{ text: "OK" }],
+            { cancelable: false }
+        );
     };
 
     getCurrentAddressType = async () => {
@@ -246,7 +245,16 @@ class SettingsScreen extends PureComponent {
                         pushWalletList();
                         setInitialWalletState({timestamp});
 
-                        global.strings.setLanguage(global.strings.getInterfaceLanguage());
+                        const rawLang = global.strings.getInterfaceLanguage();
+
+                        let safeLang =
+                            typeof rawLang === "string"
+                                ? rawLang
+                                : rawLang?.languageTag || "en";
+
+                        safeLang = safeLang.split("-")[0]; // normalize (en-GB → en)
+
+                        global.strings.setLanguage(safeLang);
                     },
                 },
             ],

@@ -14,7 +14,6 @@ import {
     Divider
 } from 'react-native-elements';
 import QRCode from 'react-native-qrcode-svg';
-import Icon from 'react-native-vector-icons/FontAwesome';
 import { Navigation } from 'react-native-navigation';
 import Config from 'react-native-config';
 import { generateAddresses } from 'src/utils/WalletUtils';
@@ -68,38 +67,50 @@ class ReceiveScreen extends PureComponent {
         Navigation.events().bindComponent(this);
     }
 
+    // ✅ RN 0.72 safe trigger
+    componentDidAppear() {
+        this.ensureAddress();
+    }
+
     componentDidUpdate(prevProps) {
         const prevWallet = prevProps.wallet?.[this.props.timestamp];
         const currentWallet = this.props.wallet?.[this.props.timestamp];
 
-        if (!currentWallet) return;
+        if (!prevWallet || !currentWallet) return;
 
-        const prevType = prevProps.defaultAddressType;
-        const currentType = this.props.defaultAddressType;
+        const prevReceive = prevWallet.receiveAddress;
+        const currentReceive = currentWallet.receiveAddress;
 
-        const prevReceive = prevWallet?.receiveAddress;
-        const currentReceive = currentWallet?.receiveAddress;
+        const prevType = prevWallet.addressType;
+        const currentType = currentWallet.addressType;
 
+        // 🔥 ONLY trigger when something actually changed
         if (
-            prevType !== currentType ||
-            prevReceive !== currentReceive
+            prevReceive !== currentReceive ||
+            prevType !== currentType
         ) {
-            this.ensureAddress(currentType);
+            console.log("🔄 ReceiveScreen update detected");
+            this.ensureAddress();
         }
     }
 
-    ensureAddress = async (forcedType) => {
+    ensureAddress = async () => {
         const { timestamp, setWalletValues, updateWalletValues, wallet } = this.props;
         const walletData = wallet[timestamp];
 
         if (!walletData) return;
 
-        const addressType =
-            forcedType ||
-            this.props.defaultAddressType ||
-            'bech32';
-
+        const addressType = walletData.addressType || 'bech32';
         const addressesByType = walletData.addressesByType || {};
+
+        // 🔥 prevent useless updates / loops
+        if (
+            walletData.receiveAddress &&
+            addressesByType[addressType] &&
+            walletData.receiveAddress === addressesByType[addressType]
+        ) {
+            return;
+        }
 
         // ✅ already exists → just switch
         if (addressesByType[addressType]) {
@@ -110,10 +121,11 @@ class ReceiveScreen extends PureComponent {
             return;
         }
 
+        // ✅ generate new
         const seed = walletData.seedPhrase.join(" ");
         const derivePath = Config.DERIVATION_PATH + "0";
 
-        const { addresses, first } = generateAddresses(
+        const newAddressObj = await generateAddresses(
             seed,
             derivePath,
             0,
@@ -121,48 +133,48 @@ class ReceiveScreen extends PureComponent {
             addressType
         );
 
+        const newAddress = Object.keys(newAddressObj)[0];
+
         updateWalletValues({
             addresses: {
                 ...walletData.addresses,
-                ...addresses
+                ...newAddressObj
             },
             addressesByType: {
                 ...addressesByType,
-                [addressType]: first
+                [addressType]: newAddress
             },
             timestamp
         });
 
         setWalletValues({
-            receiveAddress: first,
+            receiveAddress: newAddress,
             timestamp
         });
     };
 
     newAddress = async () => {
-        const { setWalletValues, updateWalletValues, timestamp, wallet, defaultAddressType } = this.props;
+        const { setWalletValues, updateWalletValues, timestamp, wallet } = this.props;
         const walletData = wallet[timestamp];
 
         if (!walletData) return;
 
-        const addressType = defaultAddressType || 'bech32';
-
+        const addressType = walletData.addressType || 'bech32';
         const addresses = walletData.addresses || {};
         const addressesByType = walletData.addressesByType || {};
 
-        // find last index safely per type
         let lastIndex = 0;
 
         for (let addr in addresses) {
-            if (addresses[addr]?.type === addressType) {
-                lastIndex = Math.max(lastIndex, addresses[addr].index || 0);
+            if (addresses[addr]?.index !== undefined) {
+                lastIndex = Math.max(lastIndex, addresses[addr].index);
             }
         }
 
         const seed = walletData.seedPhrase.join(" ");
         const derivePath = Config.DERIVATION_PATH + "0";
 
-        const { addresses: newAddresses, first } = generateAddresses(
+        const newAddressObj = await generateAddresses(
             seed,
             derivePath,
             lastIndex + 1,
@@ -170,19 +182,21 @@ class ReceiveScreen extends PureComponent {
             addressType
         );
 
+        const newAddress = Object.keys(newAddressObj)[0];
+
         setWalletValues({
-            receiveAddress: first,
+            receiveAddress: newAddress,
             timestamp
         });
 
         updateWalletValues({
             addresses: {
                 ...addresses,
-                ...newAddresses
+                ...newAddressObj
             },
             addressesByType: {
                 ...addressesByType,
-                [addressType]: first
+                [addressType]: newAddress
             },
             timestamp
         });
@@ -193,6 +207,7 @@ class ReceiveScreen extends PureComponent {
         const { receiveAddress } = wallet[timestamp];
 
         await Clipboard.setString(receiveAddress);
+
         Alert.alert(
             global.strings['receive.title'],
             global.strings['receive.copyAlert'],
@@ -213,33 +228,46 @@ class ReceiveScreen extends PureComponent {
         return (
             <View style={styles.flex}>
                 <View style={styles.basicContainer}>
-                    <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center' }}>
-                        <Text style={{ fontSize: 20, fontWeight: 'bold', color: 'black' }}>
-                            {global.strings['receive.infoSubtitle']}
-                        </Text>
-                    </View>
-                    <Divider style={{ marginTop: 5, marginBottom: 5, backgroundColor: '#106860' }} />
+                    <Text style={{ fontSize: 20, fontWeight: 'bold', color: 'black', textAlign: 'center' }}>
+                        {global.strings['receive.infoSubtitle']}
+                    </Text>
+
+                    <Divider style={{ marginVertical: 5, backgroundColor: '#106860' }} />
+
                     <View style={styles.qrContainer}>
-                        <QRCode value={receiveAddress || ''} size={200} />
+                        {/* 🔥 force re-render */}
+                        <QRCode key={receiveAddress} value={receiveAddress || ''} size={200} />
                     </View>
-                    <Text style={{ marginTop: 10, marginBottom: 10, fontSize: 11, fontWeight: 'bold', textAlign: 'center', color: 'gray' }} numberOfLines={1}>
+
+                    <Text
+                        style={{
+                            marginTop: 10,
+                            fontSize: 11,
+                            fontWeight: 'bold',
+                            textAlign: 'center',
+                            color: 'gray'
+                        }}
+                        numberOfLines={1}
+                    >
                         {receiveAddress || ''}
                     </Text>
                 </View>
+
                 <View style={styles.buttonsContainer}>
                     <Button
                         icon={{ name: "clipboard", size: 14, type: 'font-awesome', color: "white" }}
                         title={global.strings['receive.copyButton']}
                         buttonStyle={styles.buttonIn}
-                        containerStyle={{ width: "45%", justifyContent: 'center' }}
+                        containerStyle={{ width: "45%" }}
                         titleStyle={styles.buttonTitleIn}
                         onPress={this.copyAddress}
                     />
+
                     <Button
                         icon={{ name: "plus", size: 14, type: 'font-awesome', color: "white" }}
                         buttonStyle={styles.buttonIn}
                         titleStyle={styles.buttonTitleIn}
-                        containerStyle={{ width: "45%", justifyContent: 'center' }}
+                        containerStyle={{ width: "45%" }}
                         title={global.strings['receive.newButton']}
                         onPress={this.newAddress}
                     />

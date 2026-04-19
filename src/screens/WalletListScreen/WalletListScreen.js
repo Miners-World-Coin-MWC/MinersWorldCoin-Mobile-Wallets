@@ -40,7 +40,14 @@ class WalletListScreen extends PureComponent {
         const { defaultLanguage } = this.props.wallet;
 
         if (defaultLanguage) {
-            global.strings.setLanguage(defaultLanguage);
+            let safeLang =
+                typeof defaultLanguage === "string"
+                    ? defaultLanguage
+                    : "en";
+
+            safeLang = safeLang.split("-")[0];
+
+            global.strings.setLanguage(safeLang);
         }
 
         this.firstCheck();

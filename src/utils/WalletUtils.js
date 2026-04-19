@@ -227,35 +227,36 @@ export function isValidWIF(wif) {
     }
 }
 
-export function importAddressByWIF(wif, type = ADDRESS_TYPES.LEGACY) {
+export function importAddressByWIF(wif) {
     try {
         const keyPair = bitcoin.ECPair.fromWIF(wif, mwc);
 
-        switch (type) {
-            case ADDRESS_TYPES.BECH32:
-                return bitcoin.payments.p2wpkh({
-                    pubkey: keyPair.publicKey,
-                    network: mwc
-                }).address;
+        const legacy = bitcoin.payments.p2pkh({
+            pubkey: keyPair.publicKey,
+            network: mwc
+        }).address;
 
-            case ADDRESS_TYPES.SEGWIT:
-                const redeem = bitcoin.payments.p2wpkh({
-                    pubkey: keyPair.publicKey,
-                    network: mwc
-                });
+        const bech32 = bitcoin.payments.p2wpkh({
+            pubkey: keyPair.publicKey,
+            network: mwc
+        }).address;
 
-                return bitcoin.payments.p2sh({
-                    redeem,
-                    network: mwc
-                }).address;
+        const segwit = bitcoin.payments.p2sh({
+            redeem: bitcoin.payments.p2wpkh({
+                pubkey: keyPair.publicKey,
+                network: mwc
+            }),
+            network: mwc
+        }).address;
 
-            case ADDRESS_TYPES.LEGACY:
-            default:
-                return bitcoin.payments.p2pkh({
-                    pubkey: keyPair.publicKey,
-                    network: mwc
-                }).address;
-        }
+        console.log("WIF IMPORT DEBUG:", {
+            legacy,
+            segwit,
+            bech32
+        });
+
+        return { legacy, segwit, bech32 };
+
     } catch (e) {
         console.log("WIF import error:", e);
         return null;
@@ -318,14 +319,11 @@ export function generateAddresses(
         addressList[address] = {
             index: i,
             privateKey: child.toWIF(),
-            type // 👈 IMPORTANT ADDITION
+            type // ✅ keep this
         };
     }
 
-    return {
-        addresses: addressList,
-        first: Object.keys(addressList)[0] // 👈 IMPORTANT FIX
-    };
+    return addressList; // ✅ IMPORTANT: keep original structure
 }
 
 export async function checkAddresses(socketConnect, addresses) {
