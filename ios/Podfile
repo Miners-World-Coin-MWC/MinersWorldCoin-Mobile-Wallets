@@ -9,8 +9,7 @@ target 'MinersWorldCoin' do
   use_react_native!(
     :path => config[:reactNativePath],
     :hermes_enabled => false,
-    :fabric_enabled => false,
-    :turbo_modules_enabled => false
+    :fabric_enabled => false
   )
 
   permissions_path = '../node_modules/react-native-permissions/ios'
@@ -23,75 +22,72 @@ target 'MinersWorldCoin' do
   target 'MinersWorldCoinTests' do
     inherit! :complete
   end
-end
 
-post_install do |installer|
-  react_native_post_install(installer)
+  post_install do |installer|
 
-  installer.pods_project.targets.each do |target|
-    target.build_configurations.each do |config|
+    react_native_post_install(installer)
 
-      # Minimum iOS
-      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '12.0'
+    installer.pods_project.targets.each do |target|
 
-      # Modern C++
-      config.build_settings['CLANG_CXX_LANGUAGE_STANDARD'] = 'gnu++17'
-      config.build_settings['CLANG_CXX_LIBRARY'] = 'libc++'
+      target.build_configurations.each do |config|
 
-      # Fix React Native / Folly issues
-      config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
+        # Minimum iOS
+        config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '12.0'
 
-      # Prevent warnings from failing builds
-      config.build_settings['GCC_TREAT_WARNINGS_AS_ERRORS'] = 'NO'
-      config.build_settings['GCC_WARN_INHIBIT_ALL_WARNINGS'] = 'YES'
+        # Modern C++
+        config.build_settings['CLANG_CXX_LANGUAGE_STANDARD'] = 'gnu++17'
+        config.build_settings['CLANG_CXX_LIBRARY'] = 'libc++'
 
-      # ✅ FORCE Boost headers to be found (CRITICAL FIX)
-      header_paths = config.build_settings['HEADER_SEARCH_PATHS'] || '$(inherited)'
-      header_paths = [header_paths] unless header_paths.is_a?(Array)
+        # Fix React Native / Folly issues
+        config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
 
-      header_paths += [
-        '$(SRCROOT)/Pods/boost',
-        '$(SRCROOT)/Pods/boost/boost_1_76_0',
-        '$(SRCROOT)/Pods/boost/boost_1_76_0/boost',
-        '$(SRCROOT)/Pods/Headers/Public/boost',
-        '$(SRCROOT)/Pods/Headers/Public',
-        '$(PODS_ROOT)/boost/boost_1_76_0',
-        '$(PODS_ROOT)/boost/boost_1_76_0/boost'
-      ]
+        # Prevent warnings from failing builds
+        config.build_settings['GCC_TREAT_WARNINGS_AS_ERRORS'] = 'NO'
+        config.build_settings['GCC_WARN_INHIBIT_ALL_WARNINGS'] = 'YES'
 
-      config.build_settings['HEADER_SEARCH_PATHS'] = header_paths.uniq
+        # Boost headers
+        header_paths = config.build_settings['HEADER_SEARCH_PATHS'] || '$(inherited)'
+        header_paths = [header_paths] unless header_paths.is_a?(Array)
 
-      # C++ Flags
-      cpp_flags = config.build_settings['OTHER_CPLUSPLUSFLAGS'] || '$(inherited)'
-      cpp_flags = [cpp_flags] unless cpp_flags.is_a?(Array)
+        header_paths += [
+          '$(SRCROOT)/Pods/boost',
+          '$(SRCROOT)/Pods/boost/boost_1_76_0',
+          '$(SRCROOT)/Pods/boost/boost_1_76_0/boost',
+          '$(SRCROOT)/Pods/Headers/Public/boost',
+          '$(SRCROOT)/Pods/Headers/Public',
+          '$(PODS_ROOT)/boost/boost_1_76_0',
+          '$(PODS_ROOT)/boost/boost_1_76_0/boost'
+        ]
 
-      cpp_flags += [
-        '-DFOLLY_NO_CONFIG=1',
-        '-DFOLLY_MOBILE=1',
-        '-DFOLLY_USE_LIBCPP=1',
-        '-D_LIBCPP_ENABLE_CXX17_REMOVED_UNARY_BINARY_FUNCTION'
-      ]
+        config.build_settings['HEADER_SEARCH_PATHS'] = header_paths.uniq
 
-      config.build_settings['OTHER_CPLUSPLUSFLAGS'] = cpp_flags.uniq
+        # C++ flags
+        cpp_flags = config.build_settings['OTHER_CPLUSPLUSFLAGS'] || '$(inherited)'
+        cpp_flags = [cpp_flags] unless cpp_flags.is_a?(Array)
 
-      # Preprocessor defs
-      defs = config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] || '$(inherited)'
-      defs = [defs] unless defs.is_a?(Array)
+        cpp_flags += [
+          '-DFOLLY_NO_CONFIG=1',
+          '-DFOLLY_MOBILE=1',
+          '-DFOLLY_USE_LIBCPP=1',
+          '-D_LIBCPP_ENABLE_CXX17_REMOVED_UNARY_BINARY_FUNCTION'
+        ]
 
-      defs += [
-        'BOOST_NO_CXX98_FUNCTION_BASE',
-        'BOOST_NO_CXX98_BINDERS',
-        'BOOST_NO_CXX98_STD_BIND',
-        'BOOST_NO_AUTO_PTR'
-      ]
+        config.build_settings['OTHER_CPLUSPLUSFLAGS'] = cpp_flags.uniq
 
-      config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] = defs.uniq
+        # Preprocessor defs
+        defs = config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] || '$(inherited)'
+        defs = [defs] unless defs.is_a?(Array)
 
-      # 🔥 Disable TurboModules compilation
-      if target.name == 'ReactCommon'
-        config.build_settings['EXCLUDED_SOURCE_FILE_NAMES'] = 'TurboCxxModule.cpp RCTTurboModule*'
+        defs += [
+          'BOOST_NO_CXX98_FUNCTION_BASE',
+          'BOOST_NO_CXX98_BINDERS',
+          'BOOST_NO_CXX98_STD_BIND',
+          'BOOST_NO_AUTO_PTR'
+        ]
+
+        config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] = defs.uniq
+
       end
-
     end
   end
 end
