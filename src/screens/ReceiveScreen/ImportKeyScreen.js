@@ -17,29 +17,15 @@ import {
     Divider,
 } from 'react-native-elements';
 import { Navigation } from 'react-native-navigation';
-import { responsiveHeight, responsiveWidth, responsiveFontSize } from 'react-native-responsive-dimensions';
+import { responsiveHeight, responsiveWidth } from 'react-native-responsive-dimensions';
 import { connectWallet } from 'src/redux';
-import { isAddress, importAddressByWIF, getTransactionHistory, getBalance } from 'src/utils/WalletUtils';
+import { importAddressByWIF, getTransactionHistory, getAddressBalance } from 'src/utils/WalletUtils';
 
 const styles = StyleSheet.create({
     flex: {
         flex: 1,
         alignItems: 'center',
         justifyContent: 'flex-start'
-    },
-    basicContainer: {
-        padding: 10,
-        paddingTop: 10,
-        paddingBottom: 10,
-        backgroundColor: 'white',
-        borderRadius: 5,
-        alignSelf: 'center',
-        justifyContent: 'flex-start',
-        flexDirection: 'column',
-    },
-    buttonsContainer: {
-        flexDirection: 'row',
-        alignContent: 'space-between',
     },
     buttonIn: {
         backgroundColor: '#ef3b23',
@@ -48,10 +34,6 @@ const styles = StyleSheet.create({
     buttonTitleIn: {
         fontSize: 14,
         fontWeight: 'bold'
-    },
-    buttonOut: {
-        color: '#ef3b23',
-        borderRadius: 25,
     },
     buttonTitleOut: {
         fontSize: 14,
@@ -67,188 +49,220 @@ class ImportKeyScreen extends PureComponent {
 
         this.state = {
             wif: this.props.wif ? this.props.wif : "",
-        }
+            loading: false
+        };
 
         Navigation.mergeOptions(this.props.componentId, {
-            layout: {
-                backgroundColor: '#fff'
-            },
-            statusBar: {
-                visible: true,
-                style: 'dark'
-            },
+            layout: { backgroundColor: '#fff' },
+            statusBar: { visible: true, style: 'dark' },
             topBar: {
                 elevation: 0,
                 noBorder: true,
-                background: {
-                    color: 'white',
-                },
+                background: { color: 'white' },
             }
-        })
+        });
 
         Navigation.events().bindComponent(this);
     }
 
+    sanitizeKey = (key) => {
+        return key.trim().replace(/\s+/g, '');
+    };
+
     add = async () => {
-        const { wif } = this.state;
-        const { updateWalletValues, setWalletValues } = this.props;
-        const { addresses, timestamp, transactions } = this.props.wallet;
+        let { wif } = this.state;
+        const { updateWalletValues, setWalletValues, wallet, timestamp } = this.props;
 
-        const safeAddresses = (addresses && typeof addresses === 'object') ? addresses : {};
-        const safeTransactions = (transactions && typeof transactions === 'object') ? transactions : {};
+        wif = this.sanitizeKey(wif);
 
-        let importedAddress = importAddressByWIF(wif);
-
-        // ✅ HARD STOP if invalid WIF
-        if (!importedAddress) {
-            Alert.alert(
-                global.strings['importKey.title'],
-                "Invalid private key (WIF)",
-                [{ text: "OK" }]
-            );
+        if (!wif) {
+            Alert.alert("Error", "Private key is required");
             return;
         }
 
-        // ✅ DUPLICATE CHECK
-        if (importedAddress in safeAddresses) {
-            Alert.alert(
-                global.strings['importKey.title'],
-                "Address already exists in wallet",
-                [{ text: "OK" }]
-            );
+        const walletData = wallet[timestamp];
+        if (!walletData) {
+            console.log("IMPORT ERROR: walletData missing", { wallet, timestamp });
+            Alert.alert("Error", "Wallet not initialised yet");
             return;
         }
 
-        // ✅ VALID ADDRESS CHECK
-        if (!isAddress(importedAddress)) {
-            Alert.alert(
-                global.strings['importKey.title'],
-                "Invalid address derived from key",
-                [{ text: "OK" }]
-            );
-            return;
-        }
+        const safeAddresses = walletData.addresses || {};
+        const safeTransactions = walletData.transactions || {};
 
-        const address = {
-            [importedAddress]: {
-                index: 0,
-                privateKey: wif
-            }
-        };
-
-        const mergedAddresses = { ...safeAddresses, ...address };
+        this.setState({ loading: true });
 
         try {
-            // ✅ ALWAYS MERGE — never overwrite
-            updateWalletValues({
-                addresses: mergedAddresses,
-                timestamp
-            });
+            
+            const result = importAddressByWIF(wif);
 
-            setWalletValues({
-                receiveAddress: importedAddress,
-                timestamp
-            });
+            if (!result) {
+                this.setState({ loading: false });
+                Alert.alert("Error", "Invalid private key (WIF)");
+                return;
+            }
 
-            const newTransactions = await getTransactionHistory(
-                global.socketConnect,
-                mergedAddresses,
-                safeTransactions
-            );
+            const { legacy, segwit, bech32 } = result;
 
-            updateWalletValues({
-                transactions: newTransactions || {},
-                timestamp
-            });
+            // 🔒 prevent duplicates
+            const allNew = [legacy, segwit, bech32].filter(Boolean);
+            const alreadyExists = allNew.find(addr => safeAddresses[addr]);
 
-            const balance = await getBalance({
-                ...safeTransactions,
-                ...(newTransactions || {})
-            });
-
-            setWalletValues({
-                balance: balance || 0,
-                timestamp
-            });
+            if (alreadyExists) {
+                this.setState({ loading: false });
+                Alert.alert("Duplicate", "This wallet/address is already imported");
+                return;
+            }
 
             Alert.alert(
-                global.strings['importKey.title'],
-                global.strings['importKey.successAlert'],
-                [{
-                    text: global.strings['importKey.confirmAlertButton'],
-                    onPress: () => this.cancel(),
-                }],
-                { cancelable: false }
+                "Import Private Key",
+                "This will import all address formats (Legacy, SegWit, Bech32). Continue?",
+                [
+                    { text: "Cancel", style: "cancel", onPress: () => this.setState({ loading: false }) },
+                    {
+                        text: "Import",
+                        onPress: async () => {
+
+                            try {
+                                const newAddresses = {};
+
+                                if (legacy) newAddresses[legacy] = { index: 0, privateKey: wif, type: 'legacy' };
+                                if (segwit) newAddresses[segwit] = { index: 0, privateKey: wif, type: 'segwit' };
+                                if (bech32) newAddresses[bech32] = { index: 0, privateKey: wif, type: 'bech32' };
+
+                                const mergedAddresses = {
+                                    ...safeAddresses,
+                                    ...newAddresses
+                                };
+
+                                const newAddressesByType = {
+                                    ...(walletData.addressesByType || {}),
+                                    ...(legacy && { legacy }),
+                                    ...(segwit && { segwit }),
+                                    ...(bech32 && { bech32 })
+                                };
+
+                                // ✅ update wallet
+                                updateWalletValues({
+                                    addresses: mergedAddresses,
+                                    addressesByType: newAddressesByType,
+                                    isImported: true,
+                                    timestamp
+                                });
+
+                                // ✅ choose best receive address
+                                const currentType =
+                                    walletData.addressType ||
+                                    this.props.defaultAddressType ||
+                                    'bech32';
+
+                                const newReceive =
+                                    newAddressesByType[currentType] ||
+                                    bech32 ||
+                                    segwit ||
+                                    legacy;
+
+                                setWalletValues({
+                                    receiveAddress: newReceive,
+                                    timestamp
+                                });
+
+                                // 🔥 refresh transactions
+                                const newTransactions = await getTransactionHistory(
+                                    global.socketConnect,
+                                    mergedAddresses
+                                );
+
+                                updateWalletValues({
+                                    transactions: newTransactions || {},
+                                    timestamp
+                                });
+
+                                const mergedTransactions = Object.keys(newTransactions || {}).length
+                                    ? newTransactions
+                                    : safeTransactions;
+
+                                const balance = await getAddressBalance(mergedTransactions);
+
+                                setWalletValues({
+                                    balance: balance || 0,
+                                    timestamp
+                                });
+
+                                this.setState({ loading: false });
+
+                                Alert.alert("Success", "Private key imported successfully");
+
+                                this.cancel();
+
+                            } catch (err) {
+                                console.log("IMPORT FLOW ERROR:", err);
+                                this.setState({ loading: false });
+                                Alert.alert("Error", "Import failed");
+                            }
+                        }
+                    }
+                ]
             );
 
         } catch (err) {
-            console.log("IMPORT FLOW ERROR:", err);
-
-            Alert.alert(
-                "Error",
-                "Failed to import key. Check logs.",
-                [{ text: "OK" }]
-            );
+            console.log("IMPORT ERROR:", err);
+            this.setState({ loading: false });
+            Alert.alert("Error", "Something went wrong");
         }
-    }
+    };
 
     cancel = async () => {
         Navigation.dismissModal(this.props.componentId);
-    }
+    };
 
     render() {
+        const { loading } = this.state;
 
         return (
             <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-                <View enabled behavior="padding" style={[styles.flex, {justifyContent: 'flex-start', alignContent: 'center', flexDirection: 'column', backgroundColor: 'white'}]}>
+                <View style={[styles.flex, { backgroundColor: 'white' }]}>
+
                     <Image
-                        style={{width: responsiveWidth(20), height: responsiveHeight(12), resizeMode: 'contain'}}
+                        style={{ width: responsiveWidth(20), height: responsiveHeight(12), resizeMode: 'contain' }}
                         source={require('assets/icons/logo.png')}
                     />
-                    <Text style={{fontSize: 20, marginTop: 10, color: 'black'}}>
+
+                    <Text style={{ fontSize: 20, marginTop: 10, color: 'black' }}>
                         {global.strings['importKey.title']}
                     </Text>
-                    <Text style={{fontSize: 14, color: "gray", textAlign: 'center', marginTop: 10, width: '85%'}}>
+
+                    <Text style={{ fontSize: 14, color: "gray", textAlign: 'center', marginTop: 10, width: '85%' }}>
                         {global.strings['importKey.subtitle']}
                     </Text>
 
-                    <Divider style={{marginTop: 10, marginBottom: 10, width: '90%'}}/>
+                    <Divider style={{ marginTop: 10, marginBottom: 10, width: '90%' }} />
 
                     <Input
                         placeholder={global.strings['importKey.keyInput']}
-                        inputStyle={{fontSize: 14, textAlign: 'left'}}
-                        containerStyle={{paddingHorizontal: 0, width: '90%'}}
-                        onChangeText={(wif) => this.setState({wif})}
+                        containerStyle={{ width: '90%' }}
+                        onChangeText={(wif) => this.setState({ wif })}
                         defaultValue={this.state.wif}
                     />
-                    <Text style={{fontSize: 14, color: "gray", textAlign: 'left', marginTop: 5, width: '90%'}}>
-                        {global.strings['importKey.keyTooltipText']}
-                    </Text>
 
-                    <View style={{position: "absolute", bottom: 10, left: 0, right: 0, justifyContent: 'center', alignItems: 'center'}}>
+                    {loading && <Text style={{ marginTop: 10 }}>Importing...</Text>}
+
+                    <View style={{ position: "absolute", bottom: 10, left: 0, right: 0, alignItems: 'center' }}>
                         <Button
-                            icon={{ name: "check-circle",
-                                            size: 14,
-                                            type: 'font-awesome',
-                                            color: "white" }}
-
                             title={global.strings["importKey.addButton"]}
-                            containerStyle={{width: "90%", justifyContent: 'center'}}
+                            containerStyle={{ width: "90%" }}
                             buttonStyle={styles.buttonIn}
                             titleStyle={styles.buttonTitleIn}
-                            onPress={() => this.add()}
+                            onPress={this.add}
+                            disabled={loading}
                         />
-                        <Button
-                            icon={{ name: "times",
-                                            size: 14,
-                                            type: 'font-awesome',
-                                            color: "#ef3b23" }}
 
+                        <Button
                             title={global.strings["importKey.cancelButton"]}
                             type='clear'
-                            containerStyle={{width: "90%", marginTop: 10, marginBottom: 10, justifyContent: 'center'}}
+                            containerStyle={{ width: "90%", marginTop: 10 }}
                             titleStyle={styles.buttonTitleOut}
-                            onPress={() => this.cancel()}
+                            onPress={this.cancel}
                         />
                     </View>
                 </View>

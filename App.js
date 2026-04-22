@@ -7,6 +7,7 @@
  */
 
 import React from 'react';
+import './src/i18n/i18n';
 import {
   SafeAreaView,
   StyleSheet,

@@ -116,7 +116,7 @@ class FirstWalletScreen extends PureComponent {
                 <View style={[styles.flex, {justifyContent: 'center', alignContent: 'center', flexDirection: 'column', backgroundColor: "#202225"}]}>
                     <Image source={require('assets/icons/logo.png')} style={{width: Dimensions.get('window').width*0.5, height: Dimensions.get('window').height*0.25, resizeMode: 'contain'}} />
                     <Text h4 style={{fontWeight: '800', marginTop: 30, color: 'white'}}>
-                        {global.strings['firstWallet.firstLineTitle'].toUpperCase()}
+                        {(global.strings['firstWallet.firstLineTitle'] || '').toUpperCase()}
                     </Text>
                     <Text style={{fontSize: 20, fontWeight: '600', textAlign: 'center', width: '80%', color: 'white'}}>
                         {global.strings['firstWallet.moto']}

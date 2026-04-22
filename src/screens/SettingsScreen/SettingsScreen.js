@@ -20,7 +20,7 @@ import {
 import { Navigation } from 'react-native-navigation';
 import * as Keychain from 'react-native-keychain';
 import { connectWallet } from 'src/redux';
-import { getTransactionHistory, getBalance } from 'src/utils/WalletUtils';
+import { getTransactionHistory, getAddressBalance } from 'src/utils/WalletUtils';
 import { pushWalletList, pushPasswordGate, pushStarterStack, LANGUAGE_LIST_SCREEN, IMPORT_KEY_SCREEN } from 'src/navigation';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ADDRESS_TYPES } from '../../utils/WalletUtils';
@@ -107,7 +107,18 @@ class SettingsScreen extends PureComponent {
     }
 
     setAddressType = async (type) => {
+        const { wallet, setWalletValues } = this.props;
+
+        // persist globally (optional)
         await AsyncStorage.setItem("addressType", type);
+
+        // 🔥 update ALL wallets in redux
+        Object.keys(wallet).forEach((timestamp) => {
+            setWalletValues({
+                addressType: type,
+                timestamp
+            });
+        });
 
         Alert.alert(
             "Address Type Updated",
@@ -115,7 +126,7 @@ class SettingsScreen extends PureComponent {
             [{ text: "OK" }],
             { cancelable: false }
         );
-    }
+    };
 
     getCurrentAddressType = async () => {
         const type = await AsyncStorage.getItem("addressType");
@@ -135,7 +146,7 @@ class SettingsScreen extends PureComponent {
         getTransactionHistory(global.socketConnect, addresses).then((newTransactions) => {
             setWalletValues({transactions: newTransactions, timestamp: timestamp});
 
-            getBalance(newTransactions).then((balance) => {
+            getAddressBalance(newTransactions).then((balance) => {
                 setWalletValues({balance, timestamp});
             })
         });
@@ -234,7 +245,16 @@ class SettingsScreen extends PureComponent {
                         pushWalletList();
                         setInitialWalletState({timestamp});
 
-                        global.strings.setLanguage(global.strings.getInterfaceLanguage());
+                        const rawLang = global.strings.getInterfaceLanguage();
+
+                        let safeLang =
+                            typeof rawLang === "string"
+                                ? rawLang
+                                : rawLang?.languageTag || "en";
+
+                        safeLang = safeLang.split("-")[0]; // normalize (en-GB → en)
+
+                        global.strings.setLanguage(safeLang);
                     },
                 },
             ],
@@ -260,19 +280,32 @@ class SettingsScreen extends PureComponent {
     }
 
     openWIFImport = () => {
+        const { wallet } = this.props;
+
+        const walletKeys = Object.keys(wallet).filter(
+            k => typeof wallet[k] === 'object' && wallet[k].addresses
+        );
+
+        if (walletKeys.length === 0) {
+            Alert.alert("Error", "No wallet found");
+            return;
+        }
+
+        const timestamp = walletKeys[0]; // or active wallet if you track it
+
         Navigation.showModal({
             stack: {
                 children: [{
                     component: {
                         name: IMPORT_KEY_SCREEN,
                         passProps: {
-
+                            timestamp
                         },
                     }
                 }]
             }
         });
-    }
+    };
 
     render() {
         const firstSection = [
@@ -304,13 +337,13 @@ class SettingsScreen extends PureComponent {
         ]
 
         const secondSection = [
-            // {
-            //     title: global.strings['settings.importWIF'],
-            //     icon: 'key',
-            //     subtitle: null,
+            {
+                title: global.strings['settings.importWIF'],
+                icon: 'key',
+                subtitle: null,
 
-            //     onPress: () => this.openWIFImport()
-            // },
+                onPress: () => this.openWIFImport()
+            },
             {
                 title: global.strings['settings.changePassword'],
                 icon: 'unlock',
@@ -464,7 +497,7 @@ class SettingsScreen extends PureComponent {
 
                     <View style={{ flexDirection: 'row', justifyContent: "center", alignItems: "center", marginTop: 14, backgroundColor: '#202225' }}>
                         <Text style={{ fontSize: 14, padding: 10, color: 'white' }}>
-                            Version: 1.0.1, Build: 8
+                            Version: 1.0.1, Build: 9
                         </Text>
                     </View>
 
