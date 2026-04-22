@@ -1,63 +1,222 @@
-# MinersWorldCoin-mobile-wallet
+# MinersWorldCoin Mobile Wallet
 
-MinersWorldCoin mobile wallet working on React Native
+MinersWorldCoin Mobile Wallet built with React Native.
 
-## Getting Started
+---
 
-These instructions will get you a copy of the project up and running on your local machine for development and testing purposes. See `Installation` for notes on how to deploy the project on your system.
+# Features
 
-### Requirements
+* Multi-platform mobile wallet
+* Android support
+* iOS support
+* Secure wallet generation
+* Wallet import support
+* QR code scanning
+* Transaction sending and receiving
+* Biometric authentication support
+* Multi-language support
 
-- [Node](https://nodejs.org) 4.x or higher
-- [React Native](http://facebook.github.io/react-native/docs/getting-started.html) for development
-- [Xcode](https://developer.apple.com/xcode/) for iOS development (optional)
-- [Android SDK](https://developer.android.com/sdk/) for Android development (optional)
-- [Android Lollipop](https://www.android.com/versions/lollipop-5-0/) or higher for Android device testing (optional)
+---
 
-### Installation
+# Requirements
 
-Clone repository:
+Before getting started, install the following:
 
+* Node.js 18+ recommended
+* Yarn
+* React Native development environment
+* Android Studio + Android SDK (for Android builds)
+* Xcode 15+ (for iOS builds on macOS only)
+* CocoaPods (for iOS dependencies)
+
+Official setup guides:
+
+* React Native Environment Setup:
+  https://reactnative.dev/docs/environment-setup
+
+---
+
+# Installation
+
+## Clone Repository
+
+```bash
+git clone https://github.com/Miners-World-Coin-MWC/MinersWorldCoin-Mobile-Wallets
+cd MinersWorldCoin-mobile-wallet
 ```
-git clone [link]
+
+---
+
+## Install Dependencies
+
+```bash
+yarn install
 ```
 
-Install node modules:
+---
 
-```
-yarn install 
-```
+## iOS Setup
 
-Install pod dependencies for IOS:
+Install CocoaPods dependencies:
 
-```
-&& cd ios && pod install && cd ..
-```
-
-Refactor libraries to AndroidX:
-
-```
-npx jetify
+```bash
+cd ios
+pod install
+cd ..
 ```
 
-## Running
+---
 
-Once dependencies are installed, run the starter kit with:
+## Android Setup
 
-```
+Jetifier is no longer required for modern React Native versions and AndroidX support.
+
+---
+
+# Running the Development Server
+
+Start the Metro bundler:
+
+```bash
 yarn start
 ```
 
-This will start the React Packager.
+---
 
-### iOS
+# Running on Android
 
-Open workspace `ios/aokey.xcworkspace` in Xcode, build and run the project (⌘+R).
+Make sure an emulator or Android device is connected.
 
-### Android
+Run:
 
-For android development use the following:
-
+```bash
+npx react-native run-android
 ```
-react-native run-android
+
+---
+
+# Running on iOS
+
+Open the workspace:
+
+```text
+ios/MinersWorldCoin.xcworkspace
 ```
+
+Then build and run using Xcode (`⌘ + R`).
+
+Or run from terminal:
+
+```bash
+npx react-native run-ios
+```
+
+---
+
+# Building Release Versions
+
+## Android APK / AAB
+
+Generate release builds using Android Studio or Gradle.
+
+Example:
+
+```bash
+cd android
+./gradlew assembleRelease
+```
+
+Release APK output:
+
+```text
+android/app/build/outputs/apk/release/
+```
+
+---
+
+## iOS IPA
+
+iOS builds require macOS and Xcode.
+
+Unsigned IPA builds can be generated through GitHub Actions or Xcode archives.
+
+Note:
+
+* iOS apps may require sideloading if not distributed through the Apple App Store.
+* Free Apple IDs may require users to refresh the app every 7 days.
+
+See:
+
+
+./HowToSideLoad.md
+
+for installation instructions.
+
+---
+
+# CI/CD
+
+This project supports automated builds using GitHub Actions.
+
+Current CI pipeline supports:
+
+* Android builds
+* iOS builds
+* Unsigned IPA generation
+
+---
+
+# Security Notice
+
+* Always verify official release files before installing.
+* Never share recovery phrases or private keys.
+* Only download wallet builds from official project sources.
+
+---
+
+# Troubleshooting
+
+## iOS Pod Issues
+
+Try:
+
+```bash
+cd ios
+pod repo update
+pod install
+```
+
+---
+
+## Metro Cache Problems
+
+```bash
+npx react-native start --reset-cache
+```
+
+---
+
+## Android Build Problems
+
+Clean Gradle build:
+
+```bash
+cd android
+./gradlew clean
+```
+
+<!-- ---
+
+# License
+
+[INSERT LICENSE HERE] -->
+
+---
+
+# Disclaimer
+
+This software is provided as-is without warranty.
+
+Use at your own risk.
+
+Always securely back up your wallet and recovery phrase.
