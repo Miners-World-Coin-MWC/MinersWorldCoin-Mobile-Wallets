@@ -1,4 +1,4 @@
-platform :ios, '12.0'
+platform :ios, '13.4'
 
 require_relative '../node_modules/react-native/scripts/react_native_pods'
 require_relative '../node_modules/@react-native-community/cli-platform-ios/native_modules'
@@ -32,7 +32,7 @@ target 'MinersWorldCoin' do
       target.build_configurations.each do |config|
 
         # Minimum iOS
-        config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '12.0'
+        config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '13.4'
 
         # Modern C++
         config.build_settings['CLANG_CXX_LANGUAGE_STANDARD'] = 'gnu++17'
