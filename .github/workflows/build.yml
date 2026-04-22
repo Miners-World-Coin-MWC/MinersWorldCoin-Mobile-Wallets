@@ -49,9 +49,6 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      # - name: Select Xcode 15.4
-      #   run: sudo xcode-select -s /Applications/Xcode_15.4.app
-
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
@@ -73,87 +70,12 @@ jobs:
           echo "RCT_NEW_ARCH_ENABLED=0" >> $GITHUB_ENV
           echo "RCT_ENABLE_TURBO_MODULES=0" >> $GITHUB_ENV
 
-      # - name: Download & Patch Boost + Prepare Pod
-      #   run: |
-      #     set -e
-
-      #     mkdir -p ios/vendor
-      #     cd ios/vendor
-
-      #     echo "📦 Downloading Boost (stable mirror)..."
-      #     curl -L --fail https://archives.boost.io/release/1.76.0/source/boost_1_76_0.tar.bz2 -o boost.tar.bz2
-
-      #     echo "📏 Checking file size..."
-      #     ls -lh boost.tar.bz2
-
-      #     # sanity check (~100MB expected)
-      #     FILESIZE=$(stat -f%z boost.tar.bz2)
-      #     if [ "$FILESIZE" -lt 50000000 ]; then
-      #       echo "❌ Boost download is too small — failed!"
-      #       exit 1
-      #     fi
-
-      #     echo "📦 Extracting..."
-      #     tar -xjf boost.tar.bz2
-
-      #     echo "🔧 Patching Boost headers..."
-      #     find boost_1_76_0/boost -name '*.hpp' -exec sed -i '' 's/BOOST_CONSTEXPR/constexpr/g' {} +
-
-      #     echo "📦 Repacking FULL Boost (critical)..."
-      #     tar -cjf boost_full.tar.bz2 -C boost_1_76_0 .
-
-      #     echo "✅ Boost ready:"
-      #     ls -lah
-
-      #     cd ../..
-
-      # - name: Override Boost podspec (FINAL FIX)
-      #   run: |
-      #     set -e
-
-      #     BOOST_TARBALL="$GITHUB_WORKSPACE/ios/vendor/boost_full.tar.bz2"
-      #     echo "Using Boost tarball at $BOOST_TARBALL"
-
-      #     cat > node_modules/react-native/third-party-podspecs/boost.podspec << EOF
-      #     Pod::Spec.new do |s|
-      #       s.name     = 'boost'
-      #       s.version  = '1.76.0'
-      #       s.summary  = 'Boost C++ Libraries'
-      #       s.homepage = 'https://www.boost.org'
-      #       s.license  = { :type => 'Boost Software License' }
-      #       s.author   = { 'Boost' => 'boost@lists.boost.org' }
-
-      #       s.source = { :http => "file://#{File.expand_path('../../../ios/vendor/boost_full.tar.bz2', __dir__)}" }
-
-      #       s.header_dir = 'boost'
-      #       s.source_files = 'boost/**/*.hpp'
-      #       s.public_header_files = 'boost/**/*.hpp'
-
-      #       s.pod_target_xcconfig = {
-      #         'HEADER_SEARCH_PATHS' => '$(PODS_ROOT)/boost',
-      #         'CLANG_CXX_LANGUAGE_STANDARD' => 'c++17',
-      #         'CLANG_CXX_LIBRARY' => 'libc++'
-      #       }
-      #     end
-      #     EOF
-
-      # - name: Remove Boost dependency from RN podspecs
-      #   run: |
-      #     FILE="node_modules/react-native/third-party-podspecs/RCT-Folly.podspec"
-      #     sed -i '' "/s.dependency 'boost'/d" $FILE
-      #     echo "✅ Removed Boost dependency from RCT-Folly podspec"
-
-      # - name: Fix Yoga for Xcode 15
-      #   run: |
-      #     FILE="node_modules/react-native/ReactCommon/yoga/yoga/Yoga.cpp"
-      #     if [ -f "$FILE" ]; then
-      #       sed -i '' 's/hadOverflow() |/hadOverflow() ||/g' $FILE
-      #       sed -i '' 's/constexpr static/constexpr/' $FILE
-      #       echo "✅ Patched Yoga.cpp for Xcode 15"
-      #     else
-      #       echo "Yoga.cpp not found!"
-      #       exit 1
-      #     fi
+      - name: Clear CocoaPods cache
+        run: |
+          pod cache clean boost --all
+          rm -rf ~/Library/Caches/CocoaPods
+          rm -rf ios/Pods
+          rm -rf ios/Podfile.lock
 
       - name: Install Pods
         run: |
