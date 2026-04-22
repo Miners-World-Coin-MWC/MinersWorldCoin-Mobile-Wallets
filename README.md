@@ -148,7 +148,7 @@ Note:
 See:
 
 
-./HowToSideLoad.md
+[HowToSideLoad.md](https://github.com/Miners-World-Coin-MWC/MinersWorldCoin-Mobile-Wallets/blob/master/HowToSideLoad.md)
 
 for installation instructions.
 
