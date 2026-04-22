@@ -83,6 +83,10 @@ jobs:
           rm -rf Pods Podfile.lock
           pod install --repo-update
 
+      - name: Patch RCT-Folly for Xcode 15
+        run: |
+          sed -i '' 's/typedef uint8_t clockid_t;/\/\/ typedef uint8_t clockid_t;/g' ios/Pods/RCT-Folly/folly/portability/Time.h
+
       - name: Build iOS (unsigned)
         run: |
           cd ios
