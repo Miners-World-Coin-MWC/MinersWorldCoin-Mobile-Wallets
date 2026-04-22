@@ -13,7 +13,7 @@ import {
     Text,
 } from 'react-native-elements';
 import { WALLET_SCREEN, pushStarterStack, pushPasswordGate } from 'src/navigation';
-import { getMirgationWallets, removeMirgationWallets, decryptData, decryptWallet, numberWithCommas, convertMWCtoUSD, getAddressBalance, generateAddresses } from 'src/utils/WalletUtils';
+import { getMirgationWallets, removeMirgationWallets, decryptData, decryptWallet, numberWithCommas, convertMWCtoUSD, getAddressBalance, getWalletBalanceFromUTXOs, generateAddresses } from 'src/utils/WalletUtils';
 import { Navigation } from 'react-native-navigation';
 import { connectWallet } from 'src/redux';
 import Config from 'react-native-config';
@@ -182,11 +182,19 @@ class WalletItem extends PureComponent {
 
         try {
             let total = 0;
-            for (const addr of Object.keys(params.addresses)) {
-                const res = await getAddressBalance(addr);
 
-                if (res && res.confirmed != null) {
-                    total += parseFloat(res.confirmed) / 1e8; // convert satoshis to MWC
+            if (params.isImported) {
+                // 🔥 UTXO dedupe for imported wallets
+                const res = await getWalletBalanceFromUTXOs(params.addresses);
+                total = (res.confirmed || 0) / 1e8;
+            } else {
+                // ✅ original logic for normal wallets
+                for (const addr of Object.keys(params.addresses)) {
+                    const res = await getAddressBalance(addr);
+
+                    if (res && res.confirmed != null) {
+                        total += parseFloat(res.confirmed) / 1e8;
+                    }
                 }
             }
 

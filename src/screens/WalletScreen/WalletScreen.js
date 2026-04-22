@@ -18,7 +18,7 @@ import { TRANSACTION_DETAILS_SCREEN, pushWalletList } from 'src/navigation';
 import { Navigation } from 'react-native-navigation';
 import { connectWallet } from 'src/redux';
 import moment from "moment";
-import { subscribeToAddresses, getTransactionHistory, getAddressBalance, checkMempool, numberWithCommas, convertMWCtoUSD, formatUSD  } from 'src/utils/WalletUtils';
+import { subscribeToAddresses, getTransactionHistory, getAddressBalance, getWalletBalanceFromUTXOs, checkMempool, numberWithCommas, convertMWCtoUSD, formatUSD  } from 'src/utils/WalletUtils';
 import Config from 'react-native-config';
 
 const styles = StyleSheet.create({
@@ -168,18 +168,27 @@ class WalletScreen extends PureComponent {
         try {
             let totalBalance = 0;
 
-            for (const addr of Object.keys(addresses)) {
-                const res = await getAddressBalance(addr);
+            if (this.props.wallet[timestamp].isImported) {
+                // 🔥 UTXO dedupe path (imported wallets only)
+                const res = await getWalletBalanceFromUTXOs(addresses);
+                totalBalance = (res.confirmed || 0) / 1e8;
+            } else {
+                // ✅ original logic (non-imported wallets)
+                for (const addr of Object.keys(addresses)) {
+                    const res = await getAddressBalance(addr);
 
-                if (res && res.confirmed != null) {
-                    totalBalance += parseFloat(res.confirmed);
+                    if (res && res.confirmed != null) {
+                        totalBalance += parseFloat(res.confirmed);
+                    }
                 }
+
+                totalBalance = totalBalance / 1e8;
             }
 
-            // satoshi -> MWC
-            totalBalance = totalBalance / 1e8;
-
-            setWalletValues({ balance: { confirmed: totalBalance }, timestamp });
+            setWalletValues({
+                balance: { confirmed: totalBalance },
+                timestamp
+            });
 
             // ✅ USD conversion (added)
             if (this.updateBalanceUSD) {
@@ -225,18 +234,27 @@ class WalletScreen extends PureComponent {
             // ✅ Real-time balance from API
             let totalBalance = 0;
 
-            for (const addr of Object.keys(addresses)) {
-                const res = await getAddressBalance(addr);
+            if (this.props.wallet[timestamp].isImported) {
+                // 🔥 UTXO dedupe path (imported wallets only)
+                const res = await getWalletBalanceFromUTXOs(addresses);
+                totalBalance = (res.confirmed || 0) / 1e8;
+            } else {
+                // ✅ original logic (non-imported wallets)
+                for (const addr of Object.keys(addresses)) {
+                    const res = await getAddressBalance(addr);
 
-                if (res && res.confirmed != null) {
-                    totalBalance += parseFloat(res.confirmed);
+                    if (res && res.confirmed != null) {
+                        totalBalance += parseFloat(res.confirmed);
+                    }
                 }
+
+                totalBalance = totalBalance / 1e8;
             }
 
-            // satoshi -> MWC
-            totalBalance = totalBalance / 1e8;
-
-            setWalletValues({ balance: { confirmed: totalBalance }, timestamp });
+            setWalletValues({
+                balance: { confirmed: totalBalance },
+                timestamp
+            });
 
             // ✅ USD conversion (added)
             const usd = await convertMWCtoUSD(totalBalance);
@@ -255,13 +273,27 @@ class WalletScreen extends PureComponent {
         try {
             let totalBalance = 0;
 
-            for (const addr of Object.keys(addresses)) {
-                const res = await getAddressBalance(addr);
-                if (res && res.confirmed != null) totalBalance += parseFloat(res.confirmed);
+            if (this.props.wallet[timestamp].isImported) {
+                // 🔥 UTXO dedupe path (imported wallets only)
+                const res = await getWalletBalanceFromUTXOs(addresses);
+                totalBalance = (res.confirmed || 0) / 1e8;
+            } else {
+                // ✅ original logic (non-imported wallets)
+                for (const addr of Object.keys(addresses)) {
+                    const res = await getAddressBalance(addr);
+
+                    if (res && res.confirmed != null) {
+                        totalBalance += parseFloat(res.confirmed);
+                    }
+                }
+
+                totalBalance = totalBalance / 1e8;
             }
 
-            totalBalance = totalBalance / 1e8; // satoshi → MWC
-            setWalletValues({ balance: { confirmed: totalBalance }, timestamp });
+            setWalletValues({
+                balance: { confirmed: totalBalance },
+                timestamp
+            });
 
             const usd = await convertMWCtoUSD(totalBalance);
             this.setState({ usdValue: usd });

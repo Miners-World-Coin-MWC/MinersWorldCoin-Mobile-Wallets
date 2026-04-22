@@ -280,19 +280,32 @@ class SettingsScreen extends PureComponent {
     }
 
     openWIFImport = () => {
+        const { wallet } = this.props;
+
+        const walletKeys = Object.keys(wallet).filter(
+            k => typeof wallet[k] === 'object' && wallet[k].addresses
+        );
+
+        if (walletKeys.length === 0) {
+            Alert.alert("Error", "No wallet found");
+            return;
+        }
+
+        const timestamp = walletKeys[0]; // or active wallet if you track it
+
         Navigation.showModal({
             stack: {
                 children: [{
                     component: {
                         name: IMPORT_KEY_SCREEN,
                         passProps: {
-
+                            timestamp
                         },
                     }
                 }]
             }
         });
-    }
+    };
 
     render() {
         const firstSection = [

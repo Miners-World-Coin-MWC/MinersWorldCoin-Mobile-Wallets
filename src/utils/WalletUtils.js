@@ -24,9 +24,9 @@ const mwc = {
   	  private: 0x0488ade4
 	},
 	bech32: 'mwc',
-	pubKeyHash: parseInt(Config.PUB_KEY_HASH),
-	scriptHash: parseInt(Config.SCRIPT_HASH),
-	wif: parseInt(Config.WIF),
+	pubKeyHash:  20,  //parseInt(Config.PUB_KEY_HASH),
+	scriptHash: 10, //parseInt(Config.SCRIPT_HASH),
+	wif: 123, //parseInt(Config.WIF),
 	dustThreshold: 0
 }
 
@@ -230,20 +230,21 @@ export function isValidWIF(wif) {
 export function importAddressByWIF(wif) {
     try {
         const keyPair = bitcoin.ECPair.fromWIF(wif, mwc);
+        const pubkey = keyPair.publicKey;
 
         const legacy = bitcoin.payments.p2pkh({
-            pubkey: keyPair.publicKey,
+            pubkey,
             network: mwc
         }).address;
 
         const bech32 = bitcoin.payments.p2wpkh({
-            pubkey: keyPair.publicKey,
+            pubkey,
             network: mwc
         }).address;
 
         const segwit = bitcoin.payments.p2sh({
             redeem: bitcoin.payments.p2wpkh({
-                pubkey: keyPair.publicKey,
+                pubkey,
                 network: mwc
             }),
             network: mwc
@@ -832,6 +833,33 @@ export async function getUTXOs(address) {
 		console.log("utxo error", e);
 		return [];
 	}
+}
+
+export async function getWalletBalanceFromUTXOs(addresses) {
+    try {
+        const seen = new Set();
+
+        const utxoArrays = await Promise.all(
+            Object.keys(addresses).map(addr => getUTXOs(addr))
+        );
+
+        let totalSats = 0;
+
+        utxoArrays.flat().forEach(u => {
+            const key = `${u.txid}:${u.index}`;
+
+            if (seen.has(key)) return;
+
+            seen.add(key);
+            totalSats += u.value || 0;
+        });
+
+        return { confirmed: totalSats };
+
+    } catch (e) {
+        console.log("UTXO BALANCE ERROR:", e);
+        return { confirmed: 0 };
+    }
 }
 
 export async function getTransaction(txid) {

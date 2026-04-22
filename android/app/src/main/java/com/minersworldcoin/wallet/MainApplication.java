@@ -4,6 +4,9 @@ import com.facebook.react.PackageList;
 import com.facebook.react.ReactNativeHost;
 import com.facebook.react.ReactPackage;
 
+import com.facebook.react.bridge.JSIModulePackage;
+import com.swmansion.reanimated.ReanimatedJSIModulePackage;
+
 import com.reactnativenavigation.NavigationApplication;
 import com.reactnativenavigation.react.NavigationReactNativeHost;
 
