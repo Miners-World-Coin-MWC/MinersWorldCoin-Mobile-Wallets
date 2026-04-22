@@ -1,0 +1,61 @@
+diff --git a/node_modules/react-native-get-random-values/ios/RNGetRandomValues.h b/node_modules/react-native-get-random-values/ios/RNGetRandomValues.h
+index 7bc5b03..00a68d7 100644
+--- a/node_modules/react-native-get-random-values/ios/RNGetRandomValues.h
++++ b/node_modules/react-native-get-random-values/ios/RNGetRandomValues.h
+@@ -1,5 +1,5 @@
+-#import <RNGetRandomValuesSpec/RNGetRandomValuesSpec.h>
++#import <React/RCTBridgeModule.h>
+ 
+-@interface RNGetRandomValues : NSObject <NativeRNGetRandomValuesSpec>
++@interface RNGetRandomValues : NSObject <RCTBridgeModule>
+ 
+ @end
+diff --git a/node_modules/react-native-get-random-values/ios/RNGetRandomValues.mm b/node_modules/react-native-get-random-values/ios/RNGetRandomValues.mm
+index f4017c8..2098c0e 100644
+--- a/node_modules/react-native-get-random-values/ios/RNGetRandomValues.mm
++++ b/node_modules/react-native-get-random-values/ios/RNGetRandomValues.mm
+@@ -1,24 +1,31 @@
+ #import "RNGetRandomValues.h"
+ 
+ @implementation RNGetRandomValues
+-- (NSString *)getRandomBase64:(double)byteLength {
+-    NSMutableData *data = [NSMutableData dataWithLength:byteLength];
+-    int result = SecRandomCopyBytes(kSecRandomDefault, byteLength, data.mutableBytes);
++
++RCT_EXPORT_MODULE();
++
++RCT_EXPORT_BLOCKING_SYNCHRONOUS_METHOD(getRandomBase64:(double)byteLength)
++{
++    NSMutableData *data = [NSMutableData dataWithLength:(NSUInteger)byteLength];
++
++    int result = SecRandomCopyBytes(
++        kSecRandomDefault,
++        (size_t)byteLength,
++        data.mutableBytes
++    );
++
+     if (result != errSecSuccess) {
+-        @throw([NSException exceptionWithName:@"NO_RANDOM_BYTES" reason:@"Failed to aquire secure random bytes" userInfo:nil]);
++        @throw([NSException exceptionWithName:@"NO_RANDOM_BYTES"
++                                       reason:@"Failed to acquire secure random bytes"
++                                     userInfo:nil]);
+     }
+-    return [data base64EncodedStringWithOptions:0];
+-}
+ 
+-- (std::shared_ptr<facebook::react::TurboModule>)getTurboModule:
+-    (const facebook::react::ObjCTurboModule::InitParams &)params
+-{
+-    return std::make_shared<facebook::react::NativeRNGetRandomValuesSpecJSI>(params);
++    return [data base64EncodedStringWithOptions:0];
+ }
+ 
+-+ (NSString *)moduleName
+++ (BOOL)requiresMainQueueSetup
+ {
+-  return @"RNGetRandomValues";
++    return NO;
+ }
+ 
+ @end
+\ No newline at end of file
