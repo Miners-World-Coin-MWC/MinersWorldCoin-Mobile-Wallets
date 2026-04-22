@@ -15,7 +15,7 @@ import {
 import { pushWalletList } from 'src/navigation';
 import { Navigation } from 'react-native-navigation';
 import Config from 'react-native-config';
-import { findAddresses, generateAddresses, getBalance, getTransactionHistory } from 'src/utils/WalletUtils';
+import { findAddresses, generateAddresses, generateAddressesFromWIF, getBalance, getTransactionHistory } from 'src/utils/WalletUtils';
 import { connectWallet, connectPassword } from 'src/redux';
 
 const styles = StyleSheet.create({
@@ -103,19 +103,24 @@ class GenerateWalletScreen extends PureComponent {
 
     componentDidAppear() {
         const { timestamp } = this.props;
-        const { seedPhrase } = this.props.wallet[timestamp];
+        const walletData = this.props.wallet[timestamp] || {};
 
-        if (seedPhrase.length) {
+        const { seedPhrase, wifKey } = walletData;
+
+        if ((seedPhrase && seedPhrase.length) || (wifKey && wifKey.length)) {
             this.processWallet();
         }
     }
 
     componentDidMount() {
-        AppState.addEventListener('change', this.handleAppStateChange);
+        this.appStateSubscription = AppState.addEventListener(
+            'change',
+            this.handleAppStateChange
+        );
     }
 
     componentWillUnmount() {
-        AppState.removeEventListener('change', this.handleAppStateChange);
+        this.appStateSubscription?.remove();
     }
 
     handleAppStateChange = (nextAppState) => {
@@ -126,29 +131,71 @@ class GenerateWalletScreen extends PureComponent {
         this.setState({appState: nextAppState});
     }
 
-    processWallet = async() => {
-            const { setWalletValues, setDefaultValues, updateWalletValues, setPasswordValues, genarateType, timestamp } = this.props;
-            const { seedPhrase, password } = this.props.wallet[timestamp];
+    processWallet = async () => {
+        const {
+            setWalletValues,
+            setDefaultValues,
+            updateWalletValues,
+            genarateType,
+            timestamp
+        } = this.props;
 
-            const firstAddress = generateAddresses(seedPhrase.join(" "), Config.DERIVATION_PATH + "0");
-            setWalletValues({addresses: {...firstAddress}, receiveAddress: Object.keys(firstAddress)[0], addressBook: [], transactions: {}, timestamp: timestamp});
+        const walletData = this.props.wallet[timestamp] || {};
+        const { seedPhrase, wifKey } = walletData;
 
-            if (genarateType) {
-                const externalAddresses = await findAddresses(global.socketConnect, seedPhrase.join(" "), Config.DERIVATION_PATH + "0");
-                const internalAddresses = await findAddresses(global.socketConnect, seedPhrase.join(" "), Config.DERIVATION_PATH + "1");
+        let firstAddress = {};
 
-                if (Object.keys(externalAddresses).length || Object.keys(internalAddresses).length) {
-                    await updateWalletValues({addresses: {...externalAddresses, ...internalAddresses}, timestamp: timestamp});
-                }
+        if (wifKey && wifKey.length > 0) {
+            firstAddress = generateAddressesFromWIF(wifKey);
+        } else {
+            firstAddress = generateAddresses(
+                seedPhrase.join(" "),
+                Config.DERIVATION_PATH + "0"
+            );
+        }
 
+        const addressKeys = Object.keys(firstAddress);
+
+        if (!addressKeys.length) {
+            console.log("WALLET ERROR: No address generated");
+            return;
+        }
+
+        setWalletValues({
+            addresses: { ...firstAddress },
+            receiveAddress: addressKeys[0],
+            addressBook: [],
+            transactions: {},
+            timestamp
+        });
+
+        // ONLY for seed wallets
+        if (genarateType && seedPhrase && seedPhrase.length) {
+            const externalAddresses = await findAddresses(
+                global.socketConnect,
+                seedPhrase.join(" "),
+                Config.DERIVATION_PATH + "0"
+            );
+
+            const internalAddresses = await findAddresses(
+                global.socketConnect,
+                seedPhrase.join(" "),
+                Config.DERIVATION_PATH + "1"
+            );
+
+            if (Object.keys(externalAddresses).length || Object.keys(internalAddresses).length) {
+                await updateWalletValues({
+                    addresses: { ...externalAddresses, ...internalAddresses },
+                    timestamp
+                });
             }
+        }
 
-            setWalletValues({isCreated: true, timestamp: timestamp});
-            setDefaultValues({isCreated: true});
-            // pushWalletStack();
+        setWalletValues({ isCreated: true, timestamp });
+        setDefaultValues({ isCreated: true });
 
-            pushWalletList();
-    }
+        pushWalletList();
+    };
 
     render() {
 

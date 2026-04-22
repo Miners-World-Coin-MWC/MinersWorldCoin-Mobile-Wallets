@@ -14,7 +14,6 @@ import {
     Divider
 } from 'react-native-elements';
 import QRCode from 'react-native-qrcode-svg';
-import Icon from 'react-native-vector-icons/FontAwesome';
 import { Navigation } from 'react-native-navigation';
 import Config from 'react-native-config';
 import { generateAddresses } from 'src/utils/WalletUtils';
@@ -68,45 +67,147 @@ class ReceiveScreen extends PureComponent {
         Navigation.events().bindComponent(this);
     }
 
-    componentDidMount() {
+    // ✅ RN 0.72 safe trigger
+    componentDidAppear() {
         this.ensureAddress();
     }
 
-    ensureAddress = async () => {
-        // auto-generate an address if none exists
-        const { timestamp, setWalletValues, updateWalletValues, wallet } = this.props;
-        const walletData = wallet[timestamp];
+    componentDidUpdate(prevProps) {
+        const prevWallet = prevProps.wallet?.[this.props.timestamp];
+        const currentWallet = this.props.wallet?.[this.props.timestamp];
 
-        if (!walletData.receiveAddress || !walletData.addresses || Object.keys(walletData.addresses).length === 0) {
-            const seed = walletData.seedPhrase.join(" ");
-            const newAddressObj = await generateAddresses(seed, Config.DERIVATION_PATH + "0", 0, 0);
-            const firstAddress = Object.keys(newAddressObj)[0];
+        if (!prevWallet || !currentWallet) return;
 
-            // update wallet state immediately
-            setWalletValues({ receiveAddress: firstAddress, timestamp });
-            updateWalletValues({ addresses: newAddressObj, timestamp });
+        const prevReceive = prevWallet.receiveAddress;
+        const currentReceive = currentWallet.receiveAddress;
+
+        const prevType = prevWallet.addressType;
+        const currentType = currentWallet.addressType;
+
+        // 🔥 ONLY trigger when something actually changed
+        if (
+            prevReceive !== currentReceive ||
+            prevType !== currentType
+        ) {
+            console.log("🔄 ReceiveScreen update detected");
+            this.ensureAddress();
         }
     }
 
+    ensureAddress = async () => {
+        const { timestamp, setWalletValues, updateWalletValues, wallet } = this.props;
+        const walletData = wallet[timestamp];
+
+        if (!walletData) return;
+
+        const addressType = walletData.addressType || 'bech32';
+        const addressesByType = walletData.addressesByType || {};
+
+        // 🔥 prevent useless updates / loops
+        if (
+            walletData.receiveAddress &&
+            addressesByType[addressType] &&
+            walletData.receiveAddress === addressesByType[addressType]
+        ) {
+            return;
+        }
+
+        // ✅ already exists → just switch
+        if (addressesByType[addressType]) {
+            setWalletValues({
+                receiveAddress: addressesByType[addressType],
+                timestamp
+            });
+            return;
+        }
+
+        // ✅ generate new
+        const seed = walletData.seedPhrase.join(" ");
+        const derivePath = Config.DERIVATION_PATH + "0";
+
+        const newAddressObj = await generateAddresses(
+            seed,
+            derivePath,
+            0,
+            0,
+            addressType
+        );
+
+        const newAddress = Object.keys(newAddressObj)[0];
+
+        updateWalletValues({
+            addresses: {
+                ...walletData.addresses,
+                ...newAddressObj
+            },
+            addressesByType: {
+                ...addressesByType,
+                [addressType]: newAddress
+            },
+            timestamp
+        });
+
+        setWalletValues({
+            receiveAddress: newAddress,
+            timestamp
+        });
+    };
+
     newAddress = async () => {
         const { setWalletValues, updateWalletValues, timestamp, wallet } = this.props;
-        const { addresses, receiveAddress, seedPhrase } = wallet[timestamp];
+        const walletData = wallet[timestamp];
 
-        const currentIndex = addresses && addresses[receiveAddress] ? addresses[receiveAddress].index : 0;
-        const newAddressObj = await generateAddresses(seedPhrase.join(" "), Config.DERIVATION_PATH + "0", currentIndex + 1, currentIndex + 1);
-        const firstAddress = Object.keys(newAddressObj)[0];
+        if (!walletData) return;
 
-        setWalletValues({ receiveAddress: firstAddress, timestamp });
+        const addressType = walletData.addressType || 'bech32';
+        const addresses = walletData.addresses || {};
+        const addressesByType = walletData.addressesByType || {};
 
-        // merge new address into addresses
-        updateWalletValues({ addresses: { ...addresses, ...newAddressObj }, timestamp });
-    }
+        let lastIndex = 0;
+
+        for (let addr in addresses) {
+            if (addresses[addr]?.index !== undefined) {
+                lastIndex = Math.max(lastIndex, addresses[addr].index);
+            }
+        }
+
+        const seed = walletData.seedPhrase.join(" ");
+        const derivePath = Config.DERIVATION_PATH + "0";
+
+        const newAddressObj = await generateAddresses(
+            seed,
+            derivePath,
+            lastIndex + 1,
+            lastIndex + 1,
+            addressType
+        );
+
+        const newAddress = Object.keys(newAddressObj)[0];
+
+        setWalletValues({
+            receiveAddress: newAddress,
+            timestamp
+        });
+
+        updateWalletValues({
+            addresses: {
+                ...addresses,
+                ...newAddressObj
+            },
+            addressesByType: {
+                ...addressesByType,
+                [addressType]: newAddress
+            },
+            timestamp
+        });
+    };
 
     copyAddress = async () => {
         const { timestamp, wallet } = this.props;
         const { receiveAddress } = wallet[timestamp];
 
         await Clipboard.setString(receiveAddress);
+
         Alert.alert(
             global.strings['receive.title'],
             global.strings['receive.copyAlert'],
@@ -127,33 +228,46 @@ class ReceiveScreen extends PureComponent {
         return (
             <View style={styles.flex}>
                 <View style={styles.basicContainer}>
-                    <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center' }}>
-                        <Text style={{ fontSize: 20, fontWeight: 'bold', color: 'black' }}>
-                            {global.strings['receive.infoSubtitle']}
-                        </Text>
-                    </View>
-                    <Divider style={{ marginTop: 5, marginBottom: 5, backgroundColor: '#106860' }} />
+                    <Text style={{ fontSize: 20, fontWeight: 'bold', color: 'black', textAlign: 'center' }}>
+                        {global.strings['receive.infoSubtitle']}
+                    </Text>
+
+                    <Divider style={{ marginVertical: 5, backgroundColor: '#106860' }} />
+
                     <View style={styles.qrContainer}>
-                        <QRCode value={receiveAddress || ''} size={200} />
+                        {/* 🔥 force re-render */}
+                        <QRCode key={receiveAddress} value={receiveAddress || ''} size={200} />
                     </View>
-                    <Text style={{ marginTop: 10, marginBottom: 10, fontSize: 11, fontWeight: 'bold', textAlign: 'center', color: 'gray' }} numberOfLines={1}>
+
+                    <Text
+                        style={{
+                            marginTop: 10,
+                            fontSize: 11,
+                            fontWeight: 'bold',
+                            textAlign: 'center',
+                            color: 'gray'
+                        }}
+                        numberOfLines={1}
+                    >
                         {receiveAddress || ''}
                     </Text>
                 </View>
+
                 <View style={styles.buttonsContainer}>
                     <Button
                         icon={{ name: "clipboard", size: 14, type: 'font-awesome', color: "white" }}
                         title={global.strings['receive.copyButton']}
                         buttonStyle={styles.buttonIn}
-                        containerStyle={{ width: "45%", justifyContent: 'center' }}
+                        containerStyle={{ width: "45%" }}
                         titleStyle={styles.buttonTitleIn}
                         onPress={this.copyAddress}
                     />
+
                     <Button
                         icon={{ name: "plus", size: 14, type: 'font-awesome', color: "white" }}
                         buttonStyle={styles.buttonIn}
                         titleStyle={styles.buttonTitleIn}
-                        containerStyle={{ width: "45%", justifyContent: 'center' }}
+                        containerStyle={{ width: "45%" }}
                         title={global.strings['receive.newButton']}
                         onPress={this.newAddress}
                     />

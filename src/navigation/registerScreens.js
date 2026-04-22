@@ -49,17 +49,11 @@ import {
 } from './Screens';
 
 function WrappedComponent(Component) {
-    return function inject(props) {
-        const EnhancedComponent = () => (
-            <Provider>
-                    <Component
-                        {...props}
-                    />
-            </Provider>
-        );
-
-        return <EnhancedComponent />;
-    };
+    return (props) => (
+        <Provider>
+            <Component {...props} />
+        </Provider>
+    );
 }
 
 export default function () {

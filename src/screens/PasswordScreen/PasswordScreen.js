@@ -132,16 +132,20 @@ class PasswordScreen extends PureComponent {
         const { type, timestamp, password } = this.props;
 
         try {
-            if (type == 1) {
-                if(password[timestamp].useBiometric) {
-                    TouchID.isSupported()
-                        .then(biometryType => {
-                            this.biometricAuth(type, timestamp);
-                        })
-                }
+            if (
+                type === 1 &&
+                password &&
+                password[timestamp] &&
+                password[timestamp].useBiometric
+            ) {
+                TouchID.isSupported()
+                    .then(() => {
+                        this.biometricAuth(type, timestamp);
+                    })
+                    .catch(() => {});
             }
         } catch (e) {
-                console.log(e)
+            console.log(e);
         }
     }
 

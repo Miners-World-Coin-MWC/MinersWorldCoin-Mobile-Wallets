@@ -8,6 +8,12 @@ import Config from 'react-native-config';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from "axios";
 import qs from 'qs';
+
+export const ADDRESS_TYPES = {
+    LEGACY: 'legacy',
+    SEGWIT: 'segwit',
+    BECH32: 'bech32'
+};
 const API = "https://api.minersworld.org";
 
 const hashType = bitcoin.Transaction.SIGHASH_ALL;
@@ -18,9 +24,9 @@ const mwc = {
   	  private: 0x0488ade4
 	},
 	bech32: 'mwc',
-	pubKeyHash: parseInt(Config.PUB_KEY_HASH),
-	scriptHash: parseInt(Config.SCRIPT_HASH),
-	wif: parseInt(Config.WIF),
+	pubKeyHash:  20,  //parseInt(Config.PUB_KEY_HASH),
+	scriptHash: 10, //parseInt(Config.SCRIPT_HASH),
+	wif: 123, //parseInt(Config.WIF),
 	dustThreshold: 0
 }
 
@@ -131,25 +137,53 @@ function getP2SHScript(redeem) {
 }
 
 function getScriptType(script) {
-  var type = undefined
+    if (!script) return undefined;
 
-  if (script.includes(bitcoin.opcodes.OP_0) && script[1] == 20) {
-	type = 'bech32'
-  }
+    if (script[0] === bitcoin.opcodes.OP_0 && script[1] === 20) {
+        return 'bech32';
+    }
 
-  if (script.includes(bitcoin.opcodes.OP_HASH160) && script[1] == 20) {
-	type = 'segwit'
-  }
+    if (script[0] === bitcoin.opcodes.OP_HASH160 && script[1] === 20) {
+        return 'segwit';
+    }
 
-  if (script.includes(bitcoin.opcodes.OP_DUP) && script.includes(bitcoin.opcodes.OP_HASH160) && script[2] == 20) {
-	type = 'legacy'
-  }
+    if (
+        script[0] === bitcoin.opcodes.OP_DUP &&
+        script[1] === bitcoin.opcodes.OP_HASH160 &&
+        script[2] === 20
+    ) {
+        return 'legacy';
+    }
 
-  return type
+    return undefined;
 }
 
-function getAddress(node, network) {
-	return bitcoin.payments.p2wpkh({ pubkey: node.publicKey, network }).address;
+function getAddress(node, network, type = ADDRESS_TYPES.BECH32) {
+    switch (type) {
+        case ADDRESS_TYPES.LEGACY:
+            return bitcoin.payments.p2pkh({
+                pubkey: node.publicKey,
+                network
+            }).address;
+
+        case ADDRESS_TYPES.SEGWIT:
+            const redeem = bitcoin.payments.p2wpkh({
+                pubkey: node.publicKey,
+                network
+            });
+
+            return bitcoin.payments.p2sh({
+                redeem,
+                network
+            }).address;
+
+        case ADDRESS_TYPES.BECH32:
+        default:
+            return bitcoin.payments.p2wpkh({
+                pubkey: node.publicKey,
+                network
+            }).address;
+    }
 }
 
 function removeDuplicates(myArr, prop) {
@@ -184,13 +218,56 @@ export function isAddress(address) {
 	}
 }
 
+export function isValidWIF(wif) {
+    try {
+        ECPair.fromWIF(wif, mwc);
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
+
 export function importAddressByWIF(wif) {
-	try {
-		const keyPair = bitcoin.ECPair.fromWIF(wif, mwc);
-		return getAddress(keyPair, mwc);
-	} catch (e) {
-		return null;
-	}
+    try {
+        const keyPair = bitcoin.ECPair.fromWIF(wif, mwc);
+        const pubkey = keyPair.publicKey;
+
+        const legacy = bitcoin.payments.p2pkh({
+            pubkey,
+            network: mwc
+        }).address;
+
+        const bech32 = bitcoin.payments.p2wpkh({
+            pubkey,
+            network: mwc
+        }).address;
+
+        const segwit = bitcoin.payments.p2sh({
+            redeem: bitcoin.payments.p2wpkh({
+                pubkey,
+                network: mwc
+            }),
+            network: mwc
+        }).address;
+
+        console.log("WIF IMPORT DEBUG:", {
+            legacy,
+            segwit,
+            bech32
+        });
+
+        return { legacy, segwit, bech32 };
+
+    } catch (e) {
+        console.log("WIF import error:", e);
+        return null;
+    }
+}
+
+export function deriveAddressFromWIF(wif, type = ADDRESS_TYPES.LEGACY) {
+    if (!isValidWIF(wif)) return null;
+
+    return importAddressByWIF(wif, type);
 }
 
 export function getLanguageInfo(code) {
@@ -223,18 +300,31 @@ export function generateSeedPhrase(size = 12) {
 	return seedPhrase;
 }
 
-export function generateAddresses(seedPhrase, derivePath = "m/44'/0'/0'/0", startIndex = 0, endIndex = 0) {
+export function generateAddresses(
+    seedPhrase,
+    derivePath = "m/44'/0'/0'/0",
+    startIndex = 0,
+    endIndex = 0,
+    type = ADDRESS_TYPES.BECH32
+) {
     const seed = bip39.mnemonicToSeed(seedPhrase);
-	const root = bip32.fromSeed(seed, mwc);
-    let addressList = {};
-    let promises = [];
+    const root = bip32.fromSeed(seed, mwc);
 
-    for (var i = startIndex; i <= endIndex; i++) {
-		const child = root.derivePath(derivePath + "/" + i.toString());
-	    addressList[getAddress(child, mwc)] = {index: i, privateKey: child.toWIF()};
+    let addressList = {};
+
+    for (let i = startIndex; i <= endIndex; i++) {
+        const child = root.derivePath(derivePath + "/" + i.toString());
+
+        const address = getAddress(child, mwc, type);
+
+        addressList[address] = {
+            index: i,
+            privateKey: child.toWIF(),
+            type // ✅ keep this
+        };
     }
 
-    return addressList;
+    return addressList; // ✅ IMPORTANT: keep original structure
 }
 
 export async function checkAddresses(socketConnect, addresses) {
@@ -743,6 +833,33 @@ export async function getUTXOs(address) {
 		console.log("utxo error", e);
 		return [];
 	}
+}
+
+export async function getWalletBalanceFromUTXOs(addresses) {
+    try {
+        const seen = new Set();
+
+        const utxoArrays = await Promise.all(
+            Object.keys(addresses).map(addr => getUTXOs(addr))
+        );
+
+        let totalSats = 0;
+
+        utxoArrays.flat().forEach(u => {
+            const key = `${u.txid}:${u.index}`;
+
+            if (seen.has(key)) return;
+
+            seen.add(key);
+            totalSats += u.value || 0;
+        });
+
+        return { confirmed: totalSats };
+
+    } catch (e) {
+        console.log("UTXO BALANCE ERROR:", e);
+        return { confirmed: 0 };
+    }
 }
 
 export async function getTransaction(txid) {

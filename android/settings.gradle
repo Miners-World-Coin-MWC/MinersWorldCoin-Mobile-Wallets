@@ -1,9 +1,45 @@
+pluginManagement {
+    repositories {
+        gradlePluginPortal()
+        google()
+        mavenCentral()
+    }
+    resolutionStrategy {
+        eachPlugin {
+            if (requested.id.id == "com.diffplug.spotless") {
+                useModule("com.diffplug.spotless:spotless-plugin-gradle:7.0.0")
+            }
+        }
+    }
+}
+
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS)
+    repositories {
+        google()
+        mavenCentral()
+        maven { url 'https://www.jitpack.io' }
+    }
+}
+
+// 🔥 REQUIRED for RN 0.72 plugin
+includeBuild("../node_modules/react-native-gradle-plugin")
+
 rootProject.name = 'MinersWorldCoin Wallet'
+
+// 🔧 Autolinking (RN CLI)
+apply from: file("../node_modules/@react-native-community/cli-platform-android/native_modules.gradle")
+applyNativeModulesSettingsGradle(settings)
+
+// 📦 Manual modules 
 include ':react-native-vector-icons'
 project(':react-native-vector-icons').projectDir = new File(rootProject.projectDir, '../node_modules/react-native-vector-icons/android')
+
 include ':react-native-navigation'
 project(':react-native-navigation').projectDir = new File(rootProject.projectDir, '../node_modules/react-native-navigation/lib/android/app')
-apply from: file("../node_modules/@react-native-community/cli-platform-android/native_modules.gradle"); applyNativeModulesSettingsGradle(settings)
+
+// 📱 App
 include ':app'
 
-gradle.ext.reactNativeVersion = "0.68.5"
+// (optional but fine to keep)
+gradle.ext.reactNativeVersion = "0.72.7"
