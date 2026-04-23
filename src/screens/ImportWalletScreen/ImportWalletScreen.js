@@ -8,6 +8,7 @@ import {
     Alert,
     ScrollView
 } from 'react-native';
+
 import {
     Text,
     Button,
@@ -16,7 +17,8 @@ import {
 } from 'react-native-elements';
 
 import {
-    pushPasswordGate // ✅ IMPORTANT FIX
+    GENERATE_WALLET_SCREEN,
+    pushPasswordGate
 } from 'src/navigation';
 
 import { Navigation } from 'react-native-navigation';
@@ -66,6 +68,8 @@ class ImportWalletScreen extends PureComponent {
             timestamp: 0
         };
 
+        this.modalDismissedListener = null;
+
         Navigation.mergeOptions(this.props.componentId, {
             topBar: {
                 title: {
@@ -80,7 +84,28 @@ class ImportWalletScreen extends PureComponent {
 
     componentDidMount() {
         this.modalDismissedListener =
-            Navigation.events().registerModalDismissedListener(() => {});
+            Navigation.events().registerModalDismissedListener(() => {
+                const { timestamp } = this.state;
+                const { password } = this.props;
+
+                if (timestamp in password) {
+
+                    Navigation.push(this.props.componentId, {
+                        component: {
+                            name: 'starter.GenerateWalletScreen',
+                            passProps: {
+                                timestamp: timestamp
+                            },
+                            options: {
+                                topBar: {
+                                    visible: false
+                                }
+                            }
+                        }
+                    });
+
+                }
+            });
     }
 
     componentWillUnmount() {
@@ -93,6 +118,7 @@ class ImportWalletScreen extends PureComponent {
     // WARNING / CONFIRMATION
     // -----------------------------
     warningPopUp = () => {
+
         const { seedPhrase, wifKey, title } = this.state;
 
         const processedSeedPhrase = seedPhrase.filter(str => str !== "");
@@ -134,6 +160,7 @@ class ImportWalletScreen extends PureComponent {
 
         Alert.alert(
             "⚠️ IMPORT WALLET WARNING",
+
             isWif
                 ? "You are importing a PRIVATE KEY (WIF).\n\n" +
                   "This will REPLACE your current wallet.\n\n" +
@@ -155,17 +182,24 @@ class ImportWalletScreen extends PureComponent {
                     text: isWif
                         ? "Import Private Key"
                         : global.strings['importWallet.importWalletButton'],
-                    onPress: () => this.openPasswordScreen(title, processedSeedPhrase)
+
+                    onPress: () =>
+                        this.openPasswordScreen(
+                            title,
+                            processedSeedPhrase
+                        )
                 }
             ],
+
             { cancelable: false }
         );
     };
 
     // -----------------------------
-    // IMPORT HANDLER (FIXED)
+    // IMPORT HANDLER
     // -----------------------------
     openPasswordScreen = (title, processedSeedPhrase) => {
+
         const { setWalletValues, addNewWallet } = this.props;
         const { wifKey } = this.state;
 
@@ -175,14 +209,19 @@ class ImportWalletScreen extends PureComponent {
 
         addNewWallet({ timestamp });
 
+        // WIF IMPORT
         if (wifKey && wifKey.trim().length > 0) {
+
             setWalletValues({
                 wifKey: wifKey.trim(),
                 title,
                 timestamp,
                 type: "wif"
             });
+
         } else {
+
+            // SEED IMPORT
             setWalletValues({
                 seedPhrase: processedSeedPhrase,
                 title,
@@ -191,7 +230,7 @@ class ImportWalletScreen extends PureComponent {
             });
         }
 
-        // ✅ CRITICAL FIX (DO NOT CHANGE)
+        // IMPORTANT
         pushPasswordGate(0, timestamp);
     };
 
@@ -199,91 +238,133 @@ class ImportWalletScreen extends PureComponent {
     // RENDER
     // -----------------------------
     render() {
+
         const { title } = this.state;
 
         return (
             <View style={styles.flex}>
+
                 <ScrollView style={{ width: '100%', flex: 1 }}>
 
                     <View style={styles.basicContainer}>
 
-                        <Text h4 style={{ fontWeight: 'bold', color: 'black' }}>
+                        <Text
+                            h4
+                            style={{
+                                fontWeight: 'bold',
+                                color: 'black'
+                            }}
+                        >
                             {global.strings['importWallet.seedSubtitle']}
                         </Text>
 
-                        <Divider style={{ height: 1, backgroundColor: 'gray', marginVertical: 10 }} />
+                        <Divider
+                            style={{
+                                height: 1,
+                                backgroundColor: 'gray',
+                                marginVertical: 10
+                            }}
+                        />
 
                         {/* SEED INPUT */}
+
                         <Input
-                            placeholder={global.strings['importWallet.seedInput']}
+                            placeholder={
+                                global.strings['importWallet.seedInput']
+                            }
+
                             multiline
+
                             autoCorrect={false}
+
                             autoCapitalize="none"
-                            containerStyle={{ flex: 1, minHeight: 75 }}
+
+                            containerStyle={{
+                                flex: 1,
+                                minHeight: 75
+                            }}
+
                             onChangeText={(text) =>
-                                this.setState({ seedPhrase: text.split(" ") })
+                                this.setState({
+                                    seedPhrase: text.split(" ")
+                                })
                             }
                         />
 
-                        <Divider style={{ height: 1, backgroundColor: '#f0eff5', marginVertical: 10 }} />
-
-                        {/* WIF INPUT
-                        <Text style={{ fontSize: 14, fontWeight: 'bold', color: 'black' }}>
-                            Import WIF / Private Key (optional)
-                        </Text>
-
-                        <Input
-                            placeholder="Enter WIF private key"
-                            multiline
-                            autoCorrect={false}
-                            autoCapitalize="none"
-                            containerStyle={{ flex: 1, minHeight: 75 }}
-                            onChangeText={(text) =>
-                                this.setState({ wifKey: text })
-                            }
+                        <Divider
+                            style={{
+                                height: 1,
+                                backgroundColor: '#f0eff5',
+                                marginVertical: 10
+                            }}
                         />
-
-                        <Divider style={{ height: 1, backgroundColor: '#f0eff5', marginVertical: 10 }} /> */}
 
                         {/* TITLE */}
-                        <Text style={{ fontSize: 14, fontWeight: 'bold', color: 'black' }}>
+
+                        <Text
+                            style={{
+                                fontSize: 14,
+                                fontWeight: 'bold',
+                                color: 'black'
+                            }}
+                        >
                             {global.strings['importWallet.walletTitle']}
                         </Text>
 
                         <Input
-                            placeholder={global.strings['importWallet.walletTitleExampleInput']}
+                            placeholder={
+                                global.strings[
+                                    'importWallet.walletTitleExampleInput'
+                                ]
+                            }
+
                             value={title}
-                            onChangeText={(title) => this.setState({ title })}
+
+                            onChangeText={(title) =>
+                                this.setState({ title })
+                            }
                         />
 
                     </View>
 
-                    <Text style={{
-                        width: '90%',
-                        marginTop: 10,
-                        fontSize: 12,
-                        color: 'black',
-                        alignSelf: 'center'
-                    }}>
+                    <Text
+                        style={{
+                            width: '90%',
+                            marginTop: 10,
+                            fontSize: 12,
+                            color: 'black',
+                            alignSelf: 'center'
+                        }}
+                    >
                         {global.strings['importWallet.tooltipText']}
                     </Text>
 
                 </ScrollView>
 
-                <View style={{
-                    position: "absolute",
-                    bottom: 10,
-                    left: 0,
-                    right: 0,
-                    alignItems: 'center'
-                }}>
+                <View
+                    style={{
+                        position: "absolute",
+                        bottom: 10,
+                        left: 0,
+                        right: 0,
+                        alignItems: 'center'
+                    }}
+                >
+
                     <Button
-                        title={global.strings['importWallet.nextButton']}
+                        title={
+                            global.strings['importWallet.nextButton']
+                        }
+
                         buttonStyle={styles.buttonIn}
+
                         titleStyle={styles.buttonTitleIn}
+
                         onPress={() => this.warningPopUp()}
                     />
+
                 </View>
+
             </View>
         );
     }
