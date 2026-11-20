@@ -14,7 +14,7 @@ Repo: https://github.com/Miners-World-Coin-MWC/MinersWorldCoin-Mobile-Wallets.gi
 Builds:
   - versionName: 1.0.5
     versionCode: 105
-    commit: REPLACE_WITH_FULL_SHA_OF_MERGED_1_0_5_SOURCE
+    commit: 8868f50d5bf8479960ae964b7f78ee64f1528c0c
     subdir: android
     sudo:
       - set -e
