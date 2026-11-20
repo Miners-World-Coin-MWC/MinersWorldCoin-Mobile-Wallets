@@ -8,7 +8,7 @@ environment.
 ## Before opening the merge request
 
 1. The recipe is pinned to merged commit
-   `8868f50d5bf8479960ae964b7f78ee64f1528c0c` on the official repository.
+   `79f15e9316d42349d7c0fa16211a598351ba47dc` on the official repository.
    Update this hash if the 1.0.5 source changes before the F-Droid submission.
 2. Create and push a version tag only after the 1.0.5 source is finalized. Do
    not reuse a tag for changed source.
